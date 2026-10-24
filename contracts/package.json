@@ -1,0 +1,21 @@
+{
+  "name": "@sealhour/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SealRegistry: on-chain registry for SealHour (frozen centre lists, sealed packages, burned sets).",
+  "license": "MIT",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "6.1.2",
+    "hardhat": "2.29.1",
+    "solc": "0.8.26"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
