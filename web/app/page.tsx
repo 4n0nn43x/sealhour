@@ -7,8 +7,8 @@ import { SetupMessage } from "@/components/Shell";
 import type { DictKey } from "@/lib/dict";
 
 const SCREENS: { href: string; title: DictKey; body: DictKey }[] = [
-  { href: "/enrolement/", title: "nav.enrolement", body: "home.enrolement" },
-  { href: "/comite/", title: "nav.comite", body: "home.comite" },
+  { href: "/enrolment/", title: "nav.enrolement", body: "home.enrolement" },
+  { href: "/committee/", title: "nav.comite", body: "home.comite" },
   { href: "/centre/", title: "nav.centre", body: "home.centre" },
   { href: "/public/", title: "nav.public", body: "home.public" },
 ];

@@ -33,14 +33,14 @@ export function Verifier({ snap, b, data, onLeak }: { snap: ExamSnapshot; b: Bea
 
   const presets = data && drawn
     ? (() => {
-        const parakou = centresWithRc.find((c) => centreName(cfg, snap, c.centreId) === "Parakou") ?? centresWithRc[1] ?? centresWithRc[0];
+        const riverside = centresWithRc.find((c) => centreName(cfg, snap, c.centreId) === "Riverside") ?? centresWithRc[1] ?? centresWithRc[0];
         const early = data.sets.find((s) => data.burned.includes(s.setIndex)) ?? data.sets.find((s) => s.setIndex !== data.drawnSet) ?? data.sets[0];
         const list: { key: string; label: string; text: string; at: number }[] = [];
-        if (parakou) {
+        if (riverside) {
           list.push({
             key: "photo",
-            label: t("verifier.presetPhoto", { name: centreName(cfg, snap, parakou.centreId) }),
-            text: renderForCentre(drawn, parakou.centreId, parakou.rcHex, data.signatureHex).text,
+            label: t("verifier.presetPhoto", { name: centreName(cfg, snap, riverside.centreId) }),
+            text: renderForCentre(drawn, riverside.centreId, riverside.rcHex, data.signatureHex).text,
             at: inCentreWindow,
           });
         }

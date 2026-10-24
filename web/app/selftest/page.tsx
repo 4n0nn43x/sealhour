@@ -18,12 +18,12 @@ import {
 import { Page } from "@/components/Shell";
 
 const SET = JSON.stringify({
-  examTitle: "Autotest",
-  subject: "Mathématiques",
-  setLabel: "Jeu T",
+  examTitle: "Self test",
+  subject: "Mathematics",
+  setLabel: "Set T",
   questions: [
-    { id: "q1", text: "Combien font 2 et 3 ?", options: ["5", "6", "4"] },
-    { id: "q2", text: "Combien font 4 fois 3 ?", options: ["12", "7", "10"] },
+    { id: "q1", text: "What is 2 plus 3?", options: ["5", "6", "4"] },
+    { id: "q2", text: "What is 4 times 3?", options: ["12", "7", "10"] },
   ],
 });
 
@@ -59,7 +59,7 @@ async function selfTest(): Promise<string[]> {
   check("a future round is refused (TooEarlyError)", early === "TooEarlyError");
   const sig = beacon.sign(past);
   check("base32 round trip", decodeSignature(encodeSignature(sig)) === sig.replace(/^0x/, "").toLowerCase());
-  check("renderPlain", renderPlain(set).includes("Combien font 2 et 3"));
+  check("renderPlain", renderPlain(set).includes("What is 2 plus 3"));
   check("renderForCentre", renderForCentre(set, "0x" + "11".repeat(32), newRc(), sig).text.length > 0);
   check("drawSet skips burned", drawSet(sig, 3, [0, 1]) === 2);
   check("listRoot", /^0x[0-9a-f]{64}$/.test(listRoot(["0x" + "11".repeat(32)])));

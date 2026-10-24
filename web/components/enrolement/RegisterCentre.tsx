@@ -53,7 +53,7 @@ export function RegisterCentre({ onDone }: { onDone: () => void }) {
     <Section title={t("enrol.registerTitle")} id="register">
       <div className="grid-2">
         <Field label={t("common.name")} htmlFor="c-name">
-          <input id="c-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Abomey" />
+          <input id="c-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Westbrook" />
         </Field>
         <Field label={t("common.operator")} htmlFor="c-op" hint={t("enrol.operatorHint")}>
           <input id="c-op" value={operator} onChange={(e) => setOperator(e.target.value)} placeholder="0x..." list="demo-operators" />

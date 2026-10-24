@@ -1,5 +1,5 @@
 "use client";
-// "Take it, there is no pliers": a juror downloads Cotonou's package and tries to open it without the centre key.
+// "Take it, there is no pliers": a juror downloads Northgate's package and tries to open it without the centre key.
 import { useState } from "react";
 import { generateCentreKey, openForCentre } from "@sealhour/seal";
 import { useConfig } from "../Providers";
@@ -14,7 +14,7 @@ import { Button, Chip, ErrorBox, Notice, Section } from "../ui";
 export function JurorPanel({ snap, b }: { snap: ExamSnapshot; b: BeaconState }) {
   const cfg = useConfig();
   const { t } = useI18n();
-  const target = cfg.demo.centres.find((c) => c.name === "Cotonou") ?? cfg.demo.centres[0];
+  const target = cfg.demo.centres.find((c) => c.name === "Northgate") ?? cfg.demo.centres[0];
   const [setIndex, setSetIndex] = useState(0);
   const dl = useAction<FetchedCiphertext>();
   const tryOpen = useAction<{ kind: string; message: string }>();

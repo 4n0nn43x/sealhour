@@ -5,17 +5,17 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "SealHour",
-  description: "Sujets d'examen scellés sous double verrou : timelock drand et clé du centre.",
+  description: "Exam papers sealed under a double lock: drand timelock and the centre key.",
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr">
+    <html lang="en">
       <body>
         <a className="skip" href="#main">
-          Aller au contenu / Skip to content
+          Skip to content
         </a>
         <Providers>{children}</Providers>
       </body>

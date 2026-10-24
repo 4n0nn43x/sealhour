@@ -10,8 +10,8 @@ import type { Role, RoleKind } from "@/lib/roles";
 import { Loading, Notice } from "./ui";
 
 const NAV: { href: string; key: DictKey }[] = [
-  { href: "/enrolement/", key: "nav.enrolement" },
-  { href: "/comite/", key: "nav.comite" },
+  { href: "/enrolment/", key: "nav.enrolement" },
+  { href: "/committee/", key: "nav.comite" },
   { href: "/centre/", key: "nav.centre" },
   { href: "/public/", key: "nav.public" },
 ];
@@ -51,7 +51,7 @@ export function RoleSelect({ kinds, label }: { kinds?: RoleKind[]; label?: strin
 }
 
 function Header() {
-  const { t, lang, setLang } = useI18n();
+  const { t } = useI18n();
   const { config } = useApp();
   const path = usePathname();
   return (
@@ -78,15 +78,6 @@ function Header() {
             </span>
           ) : null}
           {config?.status === "ok" ? <RoleSelect /> : null}
-          <button
-            type="button"
-            className="btn btn-secondary btn-small"
-            onClick={() => setLang(lang === "fr" ? "en" : "fr")}
-            aria-label={t("lang.switch")}
-            data-testid="lang-toggle"
-          >
-            {lang === "fr" ? "EN" : "FR"}
-          </button>
         </div>
       </div>
     </header>

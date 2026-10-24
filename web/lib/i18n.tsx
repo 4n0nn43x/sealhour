@@ -1,16 +1,11 @@
 "use client";
-// Bilingual UI: French by default, English on toggle. Simple dictionary with {name} placeholders.
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { dict, type DictKey, type Lang } from "./dict";
-import { storage } from "./storage";
-
-const LANG_KEY = "sealhour.lang";
+// UI strings: simple dictionary with {name} placeholders.
+import { createContext, useContext, type ReactNode } from "react";
+import { dict, type DictKey } from "./dict";
 
 export type TFn = (key: DictKey, vars?: Record<string, string | number>) => string;
 
 interface I18n {
-  lang: Lang;
-  setLang: (l: Lang) => void;
   t: TFn;
   /** Locale for dates and numbers. */
   locale: string;
@@ -23,21 +18,10 @@ export function format(s: string, vars?: Record<string, string | number>): strin
   return s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 }
 
+const t: TFn = (key, vars) => format(dict[key] ?? key, vars);
+const value: I18n = { t, locale: "en-GB" };
+
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("fr");
-  useEffect(() => {
-    const saved = storage.get(LANG_KEY);
-    if (saved === "en" || saved === "fr") setLangState(saved);
-  }, []);
-  useEffect(() => {
-    document.documentElement.lang = lang;
-  }, [lang]);
-  const setLang = useCallback((l: Lang) => {
-    setLangState(l);
-    storage.set(LANG_KEY, l);
-  }, []);
-  const t = useCallback<TFn>((key, vars) => format(dict[lang][key] ?? dict.fr[key] ?? key, vars), [lang]);
-  const value = useMemo(() => ({ lang, setLang, t, locale: lang === "fr" ? "fr-FR" : "en-GB" }), [lang, setLang, t]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

@@ -12,8 +12,8 @@
   },
   "demo": {
     "examId": "0x0000000000000000000000000000000000000000000000000000000000000000",
-    "examTitle": "Examen blanc régional de mathématiques",
-    "subject": "Mathématiques",
+    "examTitle": "Regional mock mathematics exam",
+    "subject": "Mathematics",
     "beaconUrl": "http://127.0.0.1:8787",
     "rpcUrl": "http://127.0.0.1:8545",
     "contract": "0x0000000000000000000000000000000000000000",
@@ -25,7 +25,7 @@
     "centres": [
       {
         "centreId": "0x...",
-        "name": "Cotonou",
+        "name": "Northgate",
         "address": "0x...",
         "privateKey": "<demo key>",
         "identity": "<AGE-SECRET-KEY-1... demo identity>",
@@ -34,7 +34,7 @@
       }
     ],
     "packages": [{ "setIndex": 0, "root": "0x...", "uri": "packages/<examId>/set-0/index.json" }],
-    "phantom": { "centreId": "0x...", "name": "Centre fantôme" }
+    "phantom": { "centreId": "0x...", "name": "Phantom centre" }
   },
   "beaconUrl": "http://127.0.0.1:8787",
   "packagesBaseUrl": "/shared"

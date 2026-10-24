@@ -17,7 +17,7 @@ if (!configPath || !sharedDir) {
   process.exit(2);
 }
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-const LABEL = "examen-test-" + Date.now();
+const LABEL = "exam-test-" + Date.now();
 const PORT = 3124, BASE = `http://127.0.0.1:${PORT}`;
 const server = spawn(process.execPath, [path.join(WEB, "scripts/serve.mjs"), path.join(WEB, "out"), String(PORT), path.resolve(sharedDir)], { stdio: "pipe" });
 await new Promise((r) => server.stdout.once("data", r));
@@ -49,10 +49,10 @@ try {
   await p.waitForFunction(() => /425/.test(document.querySelector('[data-testid="relay-status"]')?.textContent ?? ""), null, { timeout: 20000 }).catch(() => {});
   ok("relay 425 before T", (await text(p, '[data-testid="relay-status"]')).includes("425"));
   await p.click('[data-testid="juror-open"]');
-  ok("juror before T refused (too early)", /Trop tôt/.test(await text(p, '[data-testid="juror-result"]')), await text(p, '[data-testid="juror-result"]'));
+  ok("juror before T refused (too early)", /Too early/.test(await text(p, '[data-testid="juror-result"]')), await text(p, '[data-testid="juror-result"]'));
   await p.close();
 
-  p = await open("/enrolement/");
+  p = await open("/enrolment/");
   await p.waitForSelector('[data-testid="phantom"]:not([disabled])', { timeout: 30000 });
   ok("freeze button disabled (already frozen)", await p.locator('[data-testid="freeze"]').isDisabled());
   await p.click('[data-testid="phantom"]');
@@ -60,7 +60,7 @@ try {
   ok("phantom refused", /AlreadyDone/.test(ph) && /KeyFrozen/.test(ph), ph.replace(/\s+/g, " "));
   await p.close();
 
-  p = await open("/comite/");
+  p = await open("/committee/");
   await p.selectOption('[data-testid="role-committee"]', "committee-2");
   await p.waitForSelector('[data-testid="set-valid"]', { timeout: 30000 });
   ok("committee list ok (count matches)", (await text(p, '[data-testid="chain-count"]')) === "4");
@@ -80,7 +80,7 @@ try {
   ok("centre key check ok", (await p.locator('[data-testid="key-blocked"]').count()) === 0);
   await p.click('[data-testid="try-early"]');
   const te = await text(p, '[data-testid="too-early"]');
-  ok("centre try early refused", /Trop tôt/.test(te) && /425/.test(te), te.replace(/\s+/g, " "));
+  ok("centre try early refused", /Too early/.test(te) && /425/.test(te), te.replace(/\s+/g, " "));
   await p.close();
 
   console.log("waiting for open round", R.open, "current", roundAt());
@@ -93,24 +93,24 @@ try {
   ok("signature from relay verified, base32 shown", b32.length > 40, b32);
   await p.reload();
   await p.selectOption('[data-testid="role-centre"]', "centre-3");
-  await p.click("text=Hors ligne (SMS)");
+  await p.click("text=Offline (SMS)");
   await p.fill("#sig-b32", b32.toLowerCase());
   await p.click('[data-testid="paste-signature"]');
   await p.waitForSelector('[data-testid="signature-ok"]', { timeout: 20000 });
   await p.click('[data-testid="open"]');
   const opened = await text(p, '[data-testid="opened"] .notice', 60000);
-  ok("offline open + draw avoids C", /Jeu tiré/.test(opened) && !/Jeu tiré : C/.test(opened), opened);
+  ok("offline open + draw avoids C", /Drawn set/.test(opened) && !/Drawn set: C/.test(opened), opened);
   ok("paper rendered", (await text(p, '[data-testid="paper"]')).length > 200);
   ok("record copies", /\d+, \d+, \d+/.test(await text(p, '[data-testid="record-copies"]')), await text(p, '[data-testid="record-copies"] .big'));
   // Typo detection
   await p.fill("#sig-b32", b32.slice(0, 5) + (b32[5] === "A" ? "B" : "A") + b32.slice(6));
   await p.click('[data-testid="paste-signature"]');
-  ok("base32 typo detected", /mal saisie/.test(await text(p, '#signature [data-testid="error"]')));
+  ok("base32 typo detected", /Mistyped/.test(await text(p, '#signature [data-testid="error"]')));
   await p.close();
 
   p = await open("/public/");
   await p.click('[data-testid="juror-open"]');
-  ok("juror after T: not a centre", /pas un centre/.test(await text(p, '[data-testid="juror-result"]')));
+  ok("juror after T: not a centre", /not a centre/.test(await text(p, '[data-testid="juror-result"]')));
   await p.close();
 
   console.log("waiting for reveal round", R.reveal, "current", roundAt());
@@ -121,7 +121,7 @@ try {
   const rc = await text(p, '[data-testid="rc-checks"]', 90000);
   ok("r_c all OK", (rc.match(/OK/g) ?? []).length === 4 && !/FAIL/.test(rc), rc.replace(/\s+/g, " "));
   ok("public copies opened", (await p.locator("#reveal .chip-ok").count()) >= 4);
-  for (const [k, re] of [["photo", /Centre\..*Parakou/], ["before", /Comité\..*comité C/], ["retyped", /Non attribuée/]]) {
+  for (const [k, re] of [["photo", /Centre\..*Riverside/], ["before", /Committee\..*committee C/], ["retyped", /Unattributed/]]) {
     await p.click(`[data-testid="preset-${k}"]`);
     await p.click('[data-testid="verify"]');
     const v = await text(p, '[data-testid="verdict"]');
@@ -144,53 +144,51 @@ try {
   await p.click('[data-testid="fetch-signature"]');
   await p.waitForSelector('[data-testid="signature-ok"]');
   await p.click('[data-testid="open"]');
-  ok("reserve open", /réserve R/.test(await text(p, '[data-testid="opened"] .notice')), await text(p, '[data-testid="opened"] .notice'));
+  ok("reserve open", /Reserve set R/.test(await text(p, '[data-testid="opened"] .notice')), await text(p, '[data-testid="opened"] .notice'));
   await p.close();
 
-  // English toggle on a loaded page
+  // English UI on a loaded page
   p = await open("/public/");
-  await p.click('[data-testid="lang-toggle"]');
   ok("english", /Proof: no key/.test(await text(p, "#proof h2")));
-  await p.click('[data-testid="lang-toggle"]');
   await p.close();
 
   }
   // Enrolment: register new centre, new exam with 3 centres, create exam
-  p = await open("/enrolement/");
+  p = await open("/enrolment/");
   await p.waitForSelector('[data-testid="centres-table"]');
   await p.selectOption('[data-testid="role"]', "office");
-  await p.fill("#c-name", "Abomey-" + Date.now());
+  await p.fill("#c-name", "Westbrook-" + Date.now());
   await p.fill("#c-op", config.demo.centres[0].address);
-  await p.click("text=Générer une paire");
+  await p.click("text=Generate a key pair");
   await p.waitForFunction(() => document.querySelector("#c-key")?.value.startsWith("age1"));
   await p.click('[data-testid="register-centre"]');
   await p.waitForSelector("#register .notice-ok, #register [data-testid=error]", { timeout: 30000 });
-  ok("register centre", /Transaction confirmée/.test(await text(p, "#register .notice-ok, #register [data-testid=error]")), await text(p, "#register .notice-ok, #register [data-testid=error]"));
+  ok("register centre", /Transaction confirmed/.test(await text(p, "#register .notice-ok, #register [data-testid=error]")), await text(p, "#register .notice-ok, #register [data-testid=error]"));
   await p.fill("#exam-id", LABEL);
   await p.waitForSelector('#freeze [data-testid="freeze"]:not([disabled])', { timeout: 30000 });
-  // keep only 3 of the 4 demo centres: untick Natitingou
+  // keep only 3 of the 4 demo centres: untick Hillcrest
   await p.locator("#freeze input[type=checkbox]").nth(3).uncheck();
-  ok("selected mismatch warning", /annonce 4 centres/.test(await text(p, "#freeze .notice-warn")));
+  ok("selected mismatch warning", /announces 4 centres/.test(await text(p, "#freeze .notice-warn")));
   await p.click('[data-testid="freeze"]');
-  ok("freeze new exam", /Transaction confirmée/.test(await text(p, "#freeze .notice-ok")));
+  ok("freeze new exam", /Transaction confirmed/.test(await text(p, "#freeze .notice-ok")));
   await p.waitForSelector('[data-testid="create-exam"]:not([disabled])', { timeout: 30000 });
   await p.click('[data-testid="create-exam"]');
-  ok("create exam", /Transaction confirmée/.test(await text(p, "#create .notice-ok")));
+  ok("create exam", /Transaction confirmed/.test(await text(p, "#create .notice-ok")));
   // Not office: register as committee A -> NotOffice
   await p.selectOption('[data-testid="role"]', "committee-0");
-  await p.fill("#c-name", "Bohicon");
+  await p.fill("#c-name", "Southfield");
   await p.fill("#c-op", config.demo.centres[0].address);
-  await p.click("text=Générer une paire");
+  await p.click("text=Generate a key pair");
   await p.waitForFunction(() => document.querySelector("#c-key")?.value.startsWith("age1"));
   await p.click('[data-testid="register-centre"]');
   ok("NotOffice decoded", /NotOffice/.test(await text(p, '#register [data-testid="error"]')));
   await p.close();
 
   // Committee on the 3 centre exam: sealing refused
-  p = await open("/comite/");
+  p = await open("/committee/");
   await p.selectOption('[data-testid="role-committee"]', "committee-0");
   await p.fill("#exam-id", LABEL);
-  ok("committee refuses (count mismatch)", /3 centres, le communiqué en annonce 4/.test(await text(p, '[data-testid="seal-refused"]')));
+  ok("committee refuses (count mismatch)", /3 centres, the notice announces 4/.test(await text(p, '[data-testid="seal-refused"]')));
   ok("seal button disabled", await p.locator('[data-testid="seal"]').isDisabled());
   // burn on demo exam after T -> TooLate
   await p.fill("#exam-id", config.demo.examId);

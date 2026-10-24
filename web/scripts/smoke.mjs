@@ -20,7 +20,7 @@ const here = path.dirname(new URL(import.meta.url).pathname);
 const webDir = path.join(here, "..");
 const PORT = 3123;
 const BASE = `http://127.0.0.1:${PORT}`;
-const PAGES = ["/", "/enrolement/", "/comite/", "/centre/", "/public/"];
+const PAGES = ["/", "/enrolment/", "/committee/", "/centre/", "/public/"];
 const live = process.argv.includes("--live");
 
 const server = spawn(process.execPath, [path.join(here, "serve.mjs"), path.join(webDir, "out"), String(PORT)], { stdio: "pipe" });
@@ -59,16 +59,15 @@ try {
     await page.close();
   }
 
-  // Language toggle on one page.
+  // English UI on one page.
   {
     const page = await browser.newPage();
     const done = watch(page, "lang");
     await page.goto(BASE + "/centre/", { waitUntil: "networkidle" });
-    await page.click('[data-testid="lang-toggle"]');
     const h = await page.locator("h2").first().textContent();
     done();
-    log(`[lang] after toggle: "${h}"`);
-    if (h !== "Configuration missing") failures.push(`lang toggle: got ${h}`);
+    log(`[lang] heading: "${h}"`);
+    if (h !== "Configuration missing") failures.push(`english heading: got ${h}`);
     await page.close();
   }
 
@@ -97,11 +96,11 @@ try {
       config = {
         deployment: { address: "0x5FbDB2315678afecb367f032d93F642f64180aa3", abi: dep.abi, chainId: 31337, rpcUrl: "http://127.0.0.1:59998", genesisTime: Math.floor(Date.now() / 1000) - 600, period: 3, office: "0x0000000000000000000000000000000000000001" },
         demo: {
-          examId: "0x" + "ab".repeat(32), examTitle: "Examen blanc", subject: "Maths", rounds: { open: 0, reveal: 0, reserveOpen: 0, reserveReveal: 0 }, announcedCentreCount: 4,
+          examId: "0x" + "ab".repeat(32), examTitle: "Mock exam", subject: "Maths", rounds: { open: 0, reveal: 0, reserveOpen: 0, reserveReveal: 0 }, announcedCentreCount: 4,
           office: { address: "0x0000000000000000000000000000000000000001", privateKey: "0x" + "01".repeat(32) },
           committees: [{ setIndex: 0, label: "A", address: "0x0000000000000000000000000000000000000002", privateKey: "0x" + "02".repeat(32) }],
           reserveCommittee: { setIndex: 1, label: "R", address: "0x0000000000000000000000000000000000000003", privateKey: "0x" + "03".repeat(32) },
-          centres: [], packages: [], phantom: { centreId: "0x" + "cd".repeat(32), name: "Centre fantôme" },
+          centres: [], packages: [], phantom: { centreId: "0x" + "cd".repeat(32), name: "Phantom centre" },
         },
         beaconUrl: "http://127.0.0.1:59997",
         packagesBaseUrl: "/shared",
