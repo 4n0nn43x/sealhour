@@ -13,6 +13,8 @@
     "e2e": "node scripts/e2e-live.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "5.2.8",
+    "@iconify/react": "6.0.2",
     "@sealhour/seal": "file:../packages/seal",
     "age-encryption": "0.3.1",
     "bootstrap": "5.3.8",
@@ -22,6 +24,7 @@
     "react-dom": "18.3.1"
   },
   "devDependencies": {
+    "@iconify-json/solar": "1.2.13",
     "@types/node": "22.20.5",
     "@types/react": "18.3.31",
     "@types/react-dom": "18.3.7",
