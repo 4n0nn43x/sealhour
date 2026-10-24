@@ -37,7 +37,7 @@ ciphertext_c = tlock(open_round, age(X25519_key_of_centre_c, exam_set))
 
 ## Prerequisites
 
-- Node 22 (tested with v22.22.0), npm, GNU make, bash.
+- Node 22 (tested with v22.22.0), npm 10 or later (npm 9 rejects the lockfiles: use `npx -y npm@10 ci` if needed), GNU make, bash.
 - Playwright with Chromium for `make test` (smoke) and `make e2e`. The scripts use a local `playwright` package if present, otherwise the global one (`npm i -g playwright && npx playwright install chromium`).
 - Free local ports: 8545 (Hardhat), 8787 (beacon), 3000 (web, `make demo`), 3123 (smoke), 3124 (e2e). Targets refuse to start when a port is busy.
 
