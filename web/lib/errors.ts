@@ -11,13 +11,16 @@ export type ErrorKind =
   | "network"
   | "rejected"
   | "funds"
+  | "pending"
   | "other";
 
 export function errorKind(e: unknown): ErrorKind {
   const err = e as { name?: string; code?: string; message?: string } | undefined;
   const name = err?.name ?? "";
   if (name === "TooEarlyError" || name === "WrongKeyError" || name === "BadSignatureError") return name;
-  if (err?.code === "ACTION_REJECTED") return "rejected";
+  const code = (e as { code?: unknown } | undefined)?.code;
+  if (code === "ACTION_REJECTED" || code === 4001) return "rejected";
+  if (code === -32002) return "pending";
   if (err?.code === "INSUFFICIENT_FUNDS") return "funds";
   const msg = String(err?.message ?? e ?? "");
   if (/\b425\b|too early/i.test(msg)) return "TooEarlyError";
@@ -30,6 +33,15 @@ const KNOWN_MESSAGES: Record<string, DictKey> = {
   NoNodeAccount: "err.NoNodeAccount",
   CentreNotInPackage: "err.CentreNotInPackage",
   BadBase32: "err.BadBase32",
+  NoWallet: "err.NoWallet",
+  NoAccount: "err.NoAccount",
+  WrongChain: "err.WrongChain",
+  NotEnoughTestEth: "err.NotEnoughTestEth",
+  FeesChanged: "err.FeesChanged",
+  BurnersHoldFunds: "err.BurnersHoldFunds",
+  BurnersOtherFunder: "err.BurnersOtherFunder",
+  PendingTx: "err.PendingTx",
+  BeaconPinMismatch: "err.BeaconPinMismatch",
 };
 
 function shortMessage(e: unknown): string {
@@ -53,9 +65,11 @@ export function explainError(e: unknown, t: TFn, cfg?: AppConfig): string {
     case "BadSignatureError":
       return t("err.BadSignatureError");
     case "network":
-      return t("err.network");
+      return t(cfg?.mode === "live" ? "err.networkLive" : "err.network");
     case "rejected":
       return t("err.rejected");
+    case "pending":
+      return t("err.pending");
     case "funds":
       return t("err.funds");
     default:

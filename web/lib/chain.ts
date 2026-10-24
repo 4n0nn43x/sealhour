@@ -1,17 +1,100 @@
 // Chain access: one read provider, contract instances, demo signers, and revert decoding.
-import { Contract, Interface, JsonRpcProvider, JsonRpcSigner, Network, Wallet, isHexString, type Signer } from "ethers";
+import { Contract, FetchRequest, Interface, JsonRpcProvider, JsonRpcSigner, Network, Wallet, isHexString, keccak256, type JsonRpcPayload, type JsonRpcResult, type Signer } from "ethers";
 import type { AppConfig } from "./config";
 
 const providers = new Map<string, JsonRpcProvider>();
 
-/** Read provider. staticNetwork: no network detection loop (no console noise when the node is down). */
+/** JSON-RPC over several URLs: an HTTP or network failure moves to the next URL (and stays there).
+ *  JSON-RPC errors (reverts) are answers, not failures: they never switch. Each URL's eth_chainId is checked once,
+ *  on first use: a URL on another chain is never used. A raw transaction is never re-broadcast after a failure (it
+ *  may have reached the node): the next URLs are polled for its hash instead. */
+class FailoverProvider extends JsonRpcProvider {
+  private at = 0;
+  private readonly chainChecks = new Map<string, Promise<void>>();
+  constructor(
+    private readonly rpcUrls: string[],
+    private readonly net: Network,
+    pollingInterval: number,
+  ) {
+    // cacheTimeout -1: a "pending" nonce read right after a confirmed transaction must not come from ethers' 250 ms
+    // request cache (measured: sequential transactions of one burner reused a nonce).
+    super(rpcUrls[0], net, { staticNetwork: net, pollingInterval, cacheTimeout: -1 });
+  }
+  override _getConnection(): FetchRequest {
+    return new FetchRequest(this.rpcUrls[this.at]!);
+  }
+  /** Rejects (for good) a URL serving another chain; a network failure is retried on the next use. */
+  private checkChain(url: string): Promise<void> {
+    let p = this.chainChecks.get(url);
+    if (!p) {
+      p = (async () => {
+        const req = new FetchRequest(url);
+        req.body = { jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] };
+        const res = await req.send();
+        res.assertOk();
+        const id = Number((res.bodyJson as { result?: string }).result);
+        if (BigInt(id) !== this.net.chainId) throw Object.assign(new Error(`RPC ${url} is on chain ${id}, not ${this.net.chainId}`), { wrongChain: true });
+      })();
+      p.catch((e: { wrongChain?: boolean }) => {
+        if (!e?.wrongChain) this.chainChecks.delete(url);
+      });
+      this.chainChecks.set(url, p);
+    }
+    return p;
+  }
+  private async failover(payload: JsonRpcPayload | JsonRpcPayload[]): Promise<JsonRpcResult[]> {
+    let last: unknown;
+    for (let k = 0; k < this.rpcUrls.length; k++) {
+      try {
+        await this.checkChain(this.rpcUrls[this.at]!);
+        return await super._send(payload);
+      } catch (e) {
+        last = e;
+        this.at = (this.at + 1) % this.rpcUrls.length;
+      }
+    }
+    throw last;
+  }
+  private async sendRaw(p: JsonRpcPayload): Promise<JsonRpcResult[]> {
+    try {
+      await this.checkChain(this.rpcUrls[this.at]!);
+    } catch {
+      return this.failover(p); // nothing was broadcast yet
+    }
+    try {
+      return await super._send(p);
+    } catch (e) {
+      this.at = (this.at + 1) % this.rpcUrls.length;
+      const hash = keccak256((p.params as string[])[0]!);
+      for (let i = 0; i < 15; i++) {
+        const [r] = await this.failover({ ...p, method: "eth_getTransactionByHash", params: [hash] }).catch(() => [undefined]);
+        if (r && "result" in r && r.result) return [{ id: p.id, result: hash }];
+        await new Promise((res) => setTimeout(res, 2000));
+      }
+      throw e;
+    }
+  }
+  override async _send(payload: JsonRpcPayload | JsonRpcPayload[]): Promise<JsonRpcResult[]> {
+    const list = Array.isArray(payload) ? payload : [payload];
+    const isRaw = (x: JsonRpcPayload) => x.method === "eth_sendRawTransaction";
+    if (!list.some(isRaw)) return this.failover(payload);
+    const rest = list.filter((x) => !isRaw(x));
+    const out = rest.length ? await this.failover(rest.length === 1 ? rest[0]! : rest) : [];
+    for (const x of list.filter(isRaw)) out.push(...(await this.sendRaw(x)));
+    return out;
+  }
+}
+
+/** Read provider (demo: the local node; live: the public RPCs in order). staticNetwork: no network detection
+ *  loop (no console noise when the node is down). Live polls every second (Base Sepolia blocks are 200 ms). */
 export function getProvider(cfg: AppConfig): JsonRpcProvider {
-  const { rpcUrl, chainId } = cfg.deployment;
-  const key = `${rpcUrl}|${chainId}`;
+  const { chainId } = cfg.deployment;
+  const urls = cfg.mode === "live" ? cfg.rpcUrls : [cfg.deployment.rpcUrl];
+  const key = `${urls.join(",")}|${chainId}`;
   let p = providers.get(key);
   if (!p) {
     const net = Network.from(chainId);
-    p = new JsonRpcProvider(rpcUrl, net, { staticNetwork: net, pollingInterval: 2000 });
+    p = cfg.mode === "live" ? new FailoverProvider(urls, net, 1000) : new JsonRpcProvider(urls[0], net, { staticNetwork: net, pollingInterval: 2000 });
     providers.set(key, p);
   }
   return p;
@@ -51,6 +134,10 @@ const CUSTOM_ERRORS = [
   "NotCentre",
   "AlreadyDone",
   "LastSet",
+  "NoKey",
+  "KeyMismatch",
+  "BadKey",
+  "Burned",
 ] as const;
 export type CustomError = (typeof CUSTOM_ERRORS)[number];
 

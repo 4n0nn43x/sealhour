@@ -1,6 +1,7 @@
 "use client";
 // Topbar building blocks: the exam PhaseStepper (with its clock popover), the ActingAs role chip and picker,
 // and RolePicker (a plain committee or centre select for pages). Role keys: office, committee-N, centre-N, juror.
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useApp } from "./Providers";
@@ -233,6 +234,11 @@ export function ActingAs() {
         {group("juror", "actor.groupPublic")}
         <div className="dropdown-divider my-2" />
         <RolePicker label={t("actor.signAs")} testId="role" />
+        <div className="dropdown-divider my-2" />
+        <Link href="/login/" className="dropdown-item d-flex align-items-center gap-2 px-0" data-testid="switch-mode">
+          <i className="ti ti-logout fs-16" aria-hidden="true" />
+          {t("actor.switchMode")}
+        </Link>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 // Page frame (Osen dashboard layout: topbar, sidenav, page title, footer) and the config gate.
-// Topbar: exam PhaseStepper, demo badge, theme toggle, ActingAs. Sidenav: Overview and the four roles, the one
+// Topbar: exam PhaseStepper, mode badge (demo or live), theme toggle, ActingAs. Live mode adds a permanent banner. Sidenav: Overview and the four roles, the one
 // whose work is due now carries a "now" badge. With a loaded config the whole page sits in a PhaseProvider.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -11,7 +11,11 @@ import { storage } from "@/lib/storage";
 import { PhaseProvider, useOptionalPhase } from "@/lib/usePhase";
 import { ActingAs, DUE, KIND, PhaseStepper } from "./Header";
 import { LogoMark } from "./Logo";
-import { Loading, Notice } from "./ui";
+import { EmptyState } from "./blocks";
+import { Hex, Loading, Notice } from "./ui";
+import type { AppConfig } from "@/lib/config";
+import { explainError } from "@/lib/errors";
+import { useAction } from "@/lib/useAction";
 
 // Layout attributes on <html>: defaults in app/layout.tsx (first paint script there too), kept up to date here.
 export const THEME_KEY = "sealhour.theme";
@@ -94,6 +98,7 @@ function Topbar({ onToggle }: { onToggle: () => void }) {
   const { t } = useI18n();
   const { config } = useApp();
   const ok = config?.status === "ok";
+  const live = ok && config.config.mode === "live";
   return (
     <header className="app-topbar">
       <div className="page-container topbar-menu gap-2">
@@ -104,7 +109,11 @@ function Topbar({ onToggle }: { onToggle: () => void }) {
           {ok ? <PhaseStepper /> : null}
         </div>
         <div className="d-flex align-items-center gap-2 flex-shrink-0">
-          {ok ? (
+          {live ? (
+            <span className="badge badge-soft-success text-uppercase fs-11 d-none d-sm-inline-block" title={t("live.badgeTitle")} data-testid="live-badge">
+              {t("live.badge")}
+            </span>
+          ) : ok ? (
             <span className="badge badge-soft-warning text-uppercase fs-11 d-none d-sm-inline-block" title={t("demo.badgeTitle")} data-testid="demo-badge">
               {t("demo.badge")}
             </span>
@@ -221,7 +230,74 @@ export function SetupMessage({ reason }: { reason?: string }) {
             {t("setup.reason")} {reason}
           </Notice>
         ) : null}
+        <p className="mb-0">
+          {t("setup.live")}{" "}
+          <Link href="/login/" className="link-primary fw-medium">
+            {t("setup.liveLink")}
+          </Link>
+        </p>
       </div>
+    </div>
+  );
+}
+
+/** Live mode chosen, no session yet. */
+function LoginNeeded() {
+  const { t } = useI18n();
+  return (
+    <div className="card" data-testid="login-needed">
+      <EmptyState
+        icon="wallet-bold-duotone"
+        title={t("live.loginTitle")}
+        body={t("live.loginBody")}
+        action={
+          <Link href="/login/" className="btn btn-primary">
+            {t("live.loginAction")}
+          </Link>
+        }
+      />
+    </div>
+  );
+}
+
+/** Permanent live mode banner: network, registry (explorer link), signer, wrong network switch. */
+function LiveBanner({ cfg }: { cfg: AppConfig }) {
+  const { t } = useI18n();
+  const { live } = useApp();
+  const sw = useAction<void>();
+  const w = live.wallet;
+  const solo = live.session?.kind === "solo";
+  const wrong = !solo && w !== null && w.chainId !== cfg.deployment.chainId;
+  return (
+    <div className={`alert ${wrong ? "alert-warning" : "alert-success"} d-flex flex-wrap align-items-center gap-2 py-2 live-banner`} role="status" data-testid="live-banner">
+      <span className="d-inline-flex align-items-center gap-2">
+        <i className="ti ti-world fs-18" aria-hidden="true" />
+        <strong>{t("live.bannerTitle")}</strong>
+      </span>
+      <span>
+        {t("live.bannerRegistry")}{" "}
+        <a href={`${cfg.explorer}/address/${cfg.deployment.address}`} target="_blank" rel="noreferrer" className="alert-link" data-testid="registry-link">
+          <Hex value={cfg.deployment.address} />
+          <i className="ti ti-external-link ms-1" aria-hidden="true" />
+        </a>
+      </span>
+      <span className="ms-lg-auto">
+        {solo ? t("live.bannerSolo") : w ? (
+          <>
+            {t("live.bannerWallet")} <Hex value={w.address} />
+          </>
+        ) : (
+          <Link href="/login/" className="alert-link">
+            {t("live.bannerConnect")}
+          </Link>
+        )}
+      </span>
+      {wrong ? (
+        <button type="button" className="btn btn-sm btn-warning" onClick={() => void sw.run(live.switchChain)} disabled={sw.busy}>
+          {t("login.switch")}
+        </button>
+      ) : null}
+      {sw.error ? <span className="w-100">{explainError(sw.error, t, cfg)}</span> : null}
     </div>
   );
 }
@@ -231,6 +307,7 @@ export function RequireConfig({ children }: { children: ReactNode }) {
   const { config } = useApp();
   if (config === null) return <Loading />;
   if (config.status === "missing") return <SetupMessage />;
+  if (config.status === "login") return <LoginNeeded />;
   if (config.status === "invalid") return <SetupMessage reason={config.message} />;
   return <>{children}</>;
 }
@@ -246,6 +323,7 @@ export function Page({ title, intro, children, needsConfig = true }: { title: st
       {layout.open ? <div className="offcanvas-backdrop fade show" onClick={layout.close} aria-hidden="true" /> : null}
       <div className="page-content">
         <main className="page-container" id="main">
+          {config?.status === "ok" && config.config.mode === "live" ? <LiveBanner cfg={config.config} /> : null}
           <PageTitle title={title} />
           {intro ? <p className="text-muted mb-3">{intro}</p> : null}
           {needsConfig ? <RequireConfig>{children}</RequireConfig> : children}

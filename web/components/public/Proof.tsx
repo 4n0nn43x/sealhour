@@ -42,7 +42,7 @@ export function Proof({ snap }: { snap: ExamSnapshot }) {
   const fetchPkg = async () => {
     const pkg = snap.packages.find((p) => p.setIndex === setIndex);
     if (!target || !pkg?.submitted) throw new Error(t("centre.noPackage"));
-    return fetchCentreCiphertext(cfg, pkg.uri, target.centreId, pkg.root);
+    return fetchCentreCiphertext(cfg, { ...pkg, examId: snap.examId }, target.centreId);
   };
   const download = () =>
     dl.run(async () => {

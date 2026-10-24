@@ -1,11 +1,13 @@
 "use client";
 // The verdict card: what the checked text points to, and "Flag this centre" on chain with the hash of the text.
-// Public action: always signed by the local node's account (the public holds no key), never by a role's wallet.
+// Public action. Demo: signed by the local node's account (the public holds no key), never by a role's wallet.
+// Live: the juror's burner (solo test) or the connected wallet.
 import { useEffect, useState } from "react";
 import { id as keccakText } from "ethers";
 import type { LeakVerdict } from "@sealhour/seal";
 import { useConfig } from "../Providers";
 import { TxStep, VerifyDetails } from "../blocks";
+import { useActor } from "@/lib/actor";
 import { nodeSigner, registry, sendTx } from "@/lib/chain";
 import { useI18n } from "@/lib/i18n";
 import type { ExamSnapshot } from "@/lib/registry";
@@ -15,6 +17,7 @@ import { VerdictView } from "./Verifier";
 export function FlagPanel({ snap, revealed, leak }: { snap: ExamSnapshot; revealed: boolean; leak: { text: string; verdict: LeakVerdict | null } | null }) {
   const cfg = useConfig();
   const { t } = useI18n();
+  const { wallet } = useActor();
   const [centreId, setCentreId] = useState(snap.centres[0]?.centreId ?? "");
   const verdict = leak?.verdict ?? null;
   const evidenceHash = keccakText(leak?.text || "no evidence");
@@ -42,7 +45,11 @@ export function FlagPanel({ snap, revealed, leak }: { snap: ExamSnapshot; reveal
             testId="flag"
             disabled={Boolean(reason) || !centreId}
             disabledReason={reason}
-            run={async () => sendTx(registry(cfg, await nodeSigner(cfg)), "flagCentre", [snap.examId, centreId, evidenceHash])}
+            run={async () => {
+              const signer = wallet ?? (cfg.mode === "demo" ? await nodeSigner(cfg) : null);
+              if (!signer) throw new Error("NoWallet");
+              return sendTx(registry(cfg, signer), "flagCentre", [snap.examId, centreId, evidenceHash]);
+            }}
           >
             <div className="mb-3" style={{ maxWidth: 320 }}>
               <label className="form-label" htmlFor="flag-centre">
@@ -61,7 +68,7 @@ export function FlagPanel({ snap, revealed, leak }: { snap: ExamSnapshot; reveal
             <p className="mb-2">
               {t("flag.evidence")} <Hex value={evidenceHash} head={10} tail={8} />
             </p>
-            <p className="mb-0">{t("flag.jurorSigner")}</p>
+            <p className="mb-0">{t(cfg.mode === "live" ? "flag.jurorSignerLive" : "flag.jurorSigner")}</p>
           </VerifyDetails>
         </div>
       </div>

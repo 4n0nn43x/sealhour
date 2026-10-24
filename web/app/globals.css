@@ -315,3 +315,16 @@ html[data-sidenav-size="sm-hover"] .sidenav-menu .logo .logo-mark {
     transform: none;
   }
 }
+
+/* Login page (Osen auth layout): a quiet brand wash instead of the template's purple gradient. */
+.auth-bg {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(var(--bs-primary-rgb), 0.1), transparent 60%),
+    var(--bs-body-bg);
+}
+.login-lead {
+  max-width: 62ch;
+}
+.auth-bg .card {
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+}

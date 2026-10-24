@@ -11,7 +11,7 @@ import { roleName } from "../Header";
 import { Button, ErrorBox, Field, Hex, Loading, Notice } from "../ui";
 import { useActor } from "@/lib/actor";
 import { roundTimeMs, type BeaconState } from "@/lib/beacon";
-import { registry, sendTx } from "@/lib/chain";
+import { registry, sendTx, ZERO32 } from "@/lib/chain";
 import { explainError } from "@/lib/errors";
 import { hm, useI18n } from "@/lib/i18n";
 import { splitList, toBytes32Id } from "@/lib/ids";
@@ -23,7 +23,7 @@ import { useSnapshot } from "@/lib/useSnapshot";
 export function Enrolement() {
   const cfg = useConfig();
   const { t } = useI18n();
-  const { role, setRole } = useApp();
+  const { role, setRole, live } = useApp();
   const p = usePhase();
   const exam = useExamId(cfg.demo.examId);
   const { snap, loading, error, reload } = useSnapshot(cfg, exam.examId);
@@ -42,11 +42,13 @@ export function Enrolement() {
   }, [cfg, tick]);
 
   const { reload: phaseReload } = p;
+  const liveRefresh = cfg.mode === "live" ? live.refresh : null;
   const refresh = useCallback(() => {
     setTick((n) => n + 1);
     reload();
     phaseReload();
-  }, [reload, phaseReload]);
+    liveRefresh?.(); // live: the session re-reads the exam list and the announced count
+  }, [reload, phaseReload, liveRefresh]);
 
   const announced = cfg.demo.announcedCentreCount;
   const frozen = Boolean(snap?.exam.frozen);
@@ -87,6 +89,11 @@ export function Enrolement() {
         {loading && !snap ? <Loading /> : null}
         <ErrorBox error={error ?? allError} cfg={cfg} />
         {steps}
+        {live.session?.kind === "wallet" && created && role?.kind === "office" ? (
+          <button type="button" className="btn btn-soft-primary" onClick={() => exam.setText(`sealhour-live-${Date.now()}`)} data-testid="new-exam">
+            {t("live.newExam")}
+          </button>
+        ) : null}
       </div>
       <div className="col-xl-4">
         <StatWidget
@@ -124,7 +131,9 @@ function RegisterStep({ state, count, onDone }: { state: StepState; count: numbe
       keyError = true;
     }
   }
-  const valid = Boolean(name.trim() && isAddress(operator) && keyHex);
+  // Live: the office registers the operator only; the centre publishes its own key (setCentreKey) from its device.
+  const live = cfg.mode === "live";
+  const valid = Boolean(name.trim() && isAddress(operator) && (live || keyHex));
 
   const generate = () =>
     gen.run(async () => {
@@ -135,6 +144,7 @@ function RegisterStep({ state, count, onDone }: { state: StepState; count: numbe
 
   const submit = async () => {
     if (!wallet) throw new Error(t("common.needWallet"));
+    if (live) return sendTx(registry(cfg, wallet), "registerCentreOperator", [centreId, operator, name.trim()]);
     return sendTx(registry(cfg, wallet), "registerCentre", [centreId, keyHex, operator, name.trim()]);
   };
 
@@ -156,6 +166,10 @@ function RegisterStep({ state, count, onDone }: { state: StepState; count: numbe
           </datalist>
         </Field>
       </div>
+      {live ? (
+        <p className="text-muted">{t("live.registerHint")}</p>
+      ) : (
+      <>
       <Field label={t("enrol.recipient")} htmlFor="c-key" hint={t("enrol.recipientHint")}>
         <div className="input-group">
           <input id="c-key" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="age1..." className="form-control" />
@@ -171,6 +185,8 @@ function RegisterStep({ state, count, onDone }: { state: StepState; count: numbe
           <pre className="code mb-0 mt-2">{identity}</pre>
         </Notice>
       ) : null}
+      </>
+      )}
       <ErrorBox error={gen.error} cfg={cfg} />
       <TxStep label={t("enrol.register")} run={submit} onDone={onDone} disabled={!valid} disabledReason={t("office.registerFill")} testId="register-centre" />
       {centreId ? (
@@ -195,17 +211,22 @@ function FreezeStep({ state, snap, all, onDone }: { state: StepState; snap: Exam
   const count = snap.exam.centreCount;
   const [selected, setSelected] = useState<string[]>([]);
 
+  const live = cfg.mode === "live";
   useEffect(() => {
-    // Default selection: the demo centres that are registered.
+    // Default selection. Demo: the demo centres that are registered. Live: the centres with a key, not frozen yet.
     const demoIds = cfg.demo.centres.map((c) => c.centreId.toLowerCase());
-    setSelected(all.filter((c) => demoIds.includes(c.centreId.toLowerCase())).map((c) => c.centreId));
-  }, [all, cfg]);
+    setSelected(all.filter((c) => (live ? c.recipient && !c.frozen : demoIds.includes(c.centreId.toLowerCase()))).map((c) => c.centreId));
+  }, [all, cfg, live]);
 
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   const root = selected.length > 0 ? listRoot(selected) : null;
 
+  // Live: freeze exactly the keys reviewed here (each centre set its own); a key rotated since reverts KeyMismatch.
+  const keys = selected.map((id) => all.find((c) => c.centreId === id)?.pubKey ?? ZERO32);
+  const missingKey = all.filter((c) => selected.includes(c.centreId) && !c.recipient).map((c) => c.name);
   const freeze = async () => {
     if (!wallet) throw new Error(t("common.needWallet"));
+    if (live) return sendTx(registry(cfg, wallet), "freezeCentresWithKeys", [snap.examId, selected, keys, root, selected.length]);
     return sendTx(registry(cfg, wallet), "freezeCentres", [snap.examId, selected, root, selected.length]);
   };
 
@@ -230,13 +251,15 @@ function FreezeStep({ state, snap, all, onDone }: { state: StepState; snap: Exam
         <div className="mt-3">
           <p className="mb-2 text-muted">{t("office.selected", { n: selected.length })}</p>
           {selected.length !== announced ? <Notice tone="warn">{t("enrol.selectedMismatch", { n: announced })}</Notice> : null}
+          {live && missingKey.length ? <Notice tone="warn">{t("live.waitingKeys", { names: missingKey.join(", ") })}</Notice> : null}
+          {live && !missingKey.length && selected.length ? <p className="text-muted mb-0">{t("live.freezeKeys")}</p> : null}
         </div>
       )}
       <TxStep
         label={t("enrol.freeze")}
         run={freeze}
         onDone={onDone}
-        disabled={frozen || selected.length === 0}
+        disabled={frozen || selected.length === 0 || (live && missingKey.length > 0)}
         disabledReason={frozen ? t("enrol.alreadyFrozen") : t("office.pickOne")}
         testId="freeze"
       />

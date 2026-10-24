@@ -6,6 +6,7 @@ import { shortHex, type TxResult } from "@/lib/chain";
 import { explainError } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
 import type { AppConfig } from "@/lib/config";
+import { useApp } from "./Providers";
 
 const ALERT = { info: "info", ok: "success", warn: "warning", error: "danger" } as const;
 
@@ -86,10 +87,21 @@ export function Chip({ ok, children }: { ok: boolean | null; children: ReactNode
 
 export function TxOutcome({ tx }: { tx: TxResult | undefined }) {
   const { t } = useI18n();
+  const { config } = useApp();
   if (!tx) return null;
+  // Live: the hash links to the block explorer.
+  const explorer = config?.status === "ok" && config.config.mode === "live" ? config.config.explorer : undefined;
   return (
     <Notice tone="ok">
-      {t("common.txDone")} <Hex value={tx.hash} /> {tx.block !== null ? t("common.inBlock", { n: tx.block }) : null}
+      {t("common.txDone")}{" "}
+      {explorer ? (
+        <a href={`${explorer}/tx/${tx.hash}`} target="_blank" rel="noreferrer" className="alert-link" data-testid="tx-link">
+          <Hex value={tx.hash} />
+        </a>
+      ) : (
+        <Hex value={tx.hash} />
+      )}{" "}
+      {tx.block !== null ? t("common.inBlock", { n: tx.block }) : null}
     </Notice>
   );
 }

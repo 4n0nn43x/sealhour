@@ -19,6 +19,32 @@ catalogue (`osen-ref/CATALOGUE.md`); prefer these blocks over new markup. All st
   as their first step when the actor does not fit, and keep it reachable (compact) when it fits, so tests can switch.
 - `KIND[kind]` gives `{ href, icon, ti, title, sub }`; `DUE[phase]` the role kind whose work is due now.
 
+## Network layer (demo and live)
+
+Pages never branch on the network: they use `useConfig()`, `useApp().role`, `useActor().wallet`, `usePhase()` and the
+lib readers below. Only a few live-only flows check `cfg.mode` (centre key and join steps, operator registration,
+freeze with keys, on-chain package publish).
+
+| Concern | Demo (`cfg.mode === "demo"`) | Live (`"live"`, Base Sepolia + drand quicknet) |
+|---|---|---|
+| Config | `/config.json` from `make demo` (`lib/config.ts`) | `/config.live.json` (committed, `scripts/live-config.mjs`) + session, built by `lib/live.ts` into the same `AppConfig` shape |
+| Mode, session | `sealhour.mode` = demo (default) | `sealhour.mode` = live; `sealhour.testnet.session` = `{ kind: "wallet" }` (shared registry) or `{ kind: "solo" }` (burners) |
+| Read provider | `getProvider(cfg)`: JsonRpcProvider on the local node | `getProvider(cfg)`: failover JSON-RPC over `cfg.rpcUrls` (publicnode, then sepolia.base.org), 1 s polling |
+| Signer | `useActor()`: demo wallet, office via the node's unlocked account | burner `Wallet` (solo) or the connected wallet's `JsonRpcSigner` (only on chain 84532 and for the role's own address) |
+| Roles | `listRoles(cfg)` from demo-state | `liveRoles()`: solo = burner personas, centres resolved on chain by operator; wallet = `office()`, `committeesOf` (reserve included), centre operator via `allCentres` + `getCentre`, then juror |
+| Beacon | `httpBeaconClient(beaconUrl, pin)` on the local relay | `relayClient(beaconUrls, pin)`: api, api2, api3.drand.sh, drand.cloudflare.com in order; 425 and 404 = too early; Cloudflare never asked for a future round; no custom header, cache buster |
+| Packages | `fetchCentreCiphertext(cfg, ref, centreId)` and `fetchPublicCopy(cfg, ref)` with `ref = { examId, setIndex, uri, root }`: relative uri = static files under `packagesBaseUrl` | uri `"chain:"`: `readChainBundle()` reads `PackageData` logs on exactly the blocks of `packageDataBlocks` and runs every check of `scripts/lib.mjs readPackageBundle`; committees publish with `postPackageData` then `submitPackage(root, "chain:")` |
+| Centre identity, r_c | from demo-state | generated on the device (`CentreKeyStep`), downloadable `.agekey` file, importable; stored under `sealhour.testnet.identity.*` and `sealhour.testnet.rc.*` |
+| Snapshot | `readSnapshot()` = one `examSnapshot` call (both modes); `readAllCentres()` = `allCentres` view. No log scan from block 0 anywhere. | same |
+
+Wallets (`lib/wallet.ts`): EIP-6963 discovery (fallback `window.ethereum`), `eth_requestAccounts`, switch or add Base
+Sepolia (EIP-3326 / EIP-3085), `accountsChanged` / `chainChanged` / `disconnect`. `useApp().live` exposes `wallets`,
+`wallet`, `connect`, `disconnect`, `switchChain`, `setSession`, `refresh` (re-read chain-derived roles).
+Login page: `components/login/Login.tsx` (test ids `enter-demo`, `wallet`, `enter-shared`, `solo-start`, `solo-continue`,
+`return-funds`, `export-burners`, `forget-burners`, `logout`). Live banner: `data-testid="live-banner"`, registry link
+`registry-link`; topbar badge `live-badge` (demo keeps `demo-badge`); tx outcomes link the explorer (`tx-link`).
+The Acting-as menu ends with "Switch mode or log out" (`switch-mode`, to `/login/`).
+
 ## Phase
 
 `usePhase()` (`lib/usePhase.tsx`, only below `Page` with a config) returns

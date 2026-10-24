@@ -16,6 +16,8 @@ const NAMES = [
   "hourglass-bold-duotone",
   "inbox-line-bold-duotone",
   "info-circle-bold-duotone",
+  "laptop-minimalistic-bold-duotone",
+  "wallet-bold-duotone",
 ];
 
 const require = createRequire(import.meta.url);

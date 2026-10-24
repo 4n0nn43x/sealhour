@@ -1,0 +1,107 @@
+{
+  "examTitle": "Regional mock mathematics exam",
+  "subject": "Mathematics",
+  "setLabel": "Set R (reserve)",
+  "questions": [
+    {
+      "id": "R-q1",
+      "text": "What is 12 × 12?",
+      "options": [
+        "144",
+        "124",
+        "24",
+        "132"
+      ]
+    },
+    {
+      "id": "R-q2",
+      "text": "What is 7 + 3 × 5?",
+      "options": [
+        "22",
+        "50",
+        "15",
+        "35"
+      ]
+    },
+    {
+      "id": "R-q3",
+      "text": "What is the area of a disc of radius 10 cm, taking π = 3.14?",
+      "options": [
+        "314 cm²",
+        "62.8 cm²",
+        "31.4 cm²",
+        "100 cm²"
+      ]
+    },
+    {
+      "id": "R-q4",
+      "text": "What is the solution of the equation x + 9 = 4?",
+      "options": [
+        "x = -5",
+        "x = 5",
+        "x = 13",
+        "x = -13"
+      ]
+    },
+    {
+      "id": "R-q5",
+      "text": "What percentage is the fraction 3/5?",
+      "options": [
+        "60%",
+        "35%",
+        "30%",
+        "53%"
+      ]
+    },
+    {
+      "id": "R-q6",
+      "text": "A triangle has sides of 3 cm, 4 cm and 5 cm. What is its perimeter?",
+      "options": [
+        "12 cm",
+        "60 cm",
+        "6 cm",
+        "9 cm"
+      ]
+    },
+    {
+      "id": "R-q7",
+      "text": "How many faces does a right triangular prism have?",
+      "options": [
+        "5",
+        "6",
+        "3",
+        "9"
+      ]
+    },
+    {
+      "id": "R-q8",
+      "text": "What is 3.467 rounded to the nearest tenth?",
+      "options": [
+        "3.5",
+        "3.4",
+        "3.47",
+        "4"
+      ]
+    },
+    {
+      "id": "R-q9",
+      "text": "A trader buys a pineapple for $3.00 and sells it for $4.50. What is the profit?",
+      "options": [
+        "$1.50",
+        "$7.50",
+        "$4.50",
+        "$0.50"
+      ]
+    },
+    {
+      "id": "R-q10",
+      "text": "What is the reciprocal of 4?",
+      "options": [
+        "1/4",
+        "-4",
+        "0.4",
+        "4"
+      ]
+    }
+  ]
+}

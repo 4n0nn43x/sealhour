@@ -56,7 +56,7 @@ export function RevealPanel(props: { snap: ExamSnapshot; b: BeaconState; data: R
       const isReserve = p.setIndex === snap.exam.setCount;
       try {
         if (!p.submitted) throw new Error(t("public.notPublished"));
-        const text = await openText({ tlocked: await fetchPublicCopy(cfg, p.uri), client: b.client });
+        const text = await openText({ tlocked: await fetchPublicCopy(cfg, { ...p, examId: snap.examId }), client: b.client });
         // The reserve opens at its own round: a reserve leak before it points to the reserve committee.
         const openTimeMs = isReserve ? roundTimeMs(cfg, b.info, snap.exam.reserveOpenRound) : undefined;
         sets.push({ setIndex: p.setIndex, set: parseExamSet(text), ...(isReserve ? { openTimeMs } : {}) });

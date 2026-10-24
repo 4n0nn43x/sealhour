@@ -51,8 +51,10 @@ export function OpenControls(props: {
   const [goodSig, setGoodSig] = useState<string | null>(null);
   const smsId = useId();
   const reached = b.round >= round;
-  const disabled = !reached || Boolean(blockedReason);
-  const reason = blockedReason ?? (!reached ? t("tx.opensAt", { time: hm(opensAt, locale) }) : null);
+  // The beacon chain info (public key) is needed to check the signature: wait for it (or its cached copy).
+  const noInfo = !b.info ? (b.infoError ? t("centre.noInfo") : t("common.loading")) : null;
+  const disabled = !reached || Boolean(blockedReason) || noInfo !== null;
+  const reason = blockedReason ?? (!reached ? t("tx.opensAt", { time: hm(opensAt, locale) }) : noInfo);
 
   const open = (how: "relay" | "sms", getSig: () => Promise<string>) => {
     setVia(how);
@@ -69,7 +71,7 @@ export function OpenControls(props: {
       const setIndex = reserve ? snap.exam.setCount : drawSet(sig, snap.exam.setCount, burned, submittedIndexes(snap));
       const pkg = snap.packages.find((p) => p.setIndex === setIndex);
       if (!pkg?.submitted) throw new Error(t("centre.noPackage"));
-      const f = await fetchCentreCiphertext(cfg, pkg.uri, centre.centreId, pkg.root);
+      const f = await fetchCentreCiphertext(cfg, { ...pkg, examId: snap.examId }, centre.centreId);
       if (!f.leafOk || !f.rootOk) throw new Error(t("centre.integrityFail"));
       const bytes = await openForCentre({ ciphertext: f.ciphertext, identity: centre.identity, client });
       const set = parseExamSet(new TextDecoder().decode(bytes));

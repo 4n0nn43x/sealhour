@@ -15,7 +15,7 @@ import { registry, revertName, sendTx, type TxResult } from "@/lib/chain";
 import { fetchText, sharedUrl } from "@/lib/config";
 import { explainError } from "@/lib/errors";
 import { formatDuration, hm, useI18n, type TFn } from "@/lib/i18n";
-import { downloadText, packageUri, type PackageIndex } from "@/lib/packages";
+import { CHAIN_URI, downloadText, packageBundleBytes, packageUri, readChainParts, type PackageIndex } from "@/lib/packages";
 import { setLabel, type ExamSnapshot } from "@/lib/registry";
 import { useAction } from "@/lib/useAction";
 import { usePhase } from "@/lib/usePhase";
@@ -301,7 +301,17 @@ function SealStep({
     });
     const index: PackageIndex = { setIndex, label, round: openRound, root: res.root, items, publicCopy: "public.tlock" };
     files["index.json"] = JSON.stringify(index, null, 2) + "\n";
-    return { index, files, uri: packageUri(snap.examId, setIndex) };
+    return { index, files, uri: cfg.mode === "live" ? CHAIN_URI : packageUri(snap.examId, setIndex) };
+  };
+
+  // Live: the files go on chain (postPackageData), then the root with the URI "chain:". Parts already posted by an
+  // interrupted publish are never posted twice: their own root is submitted.
+  const publishOnChain = async (s: Sealed): Promise<TxResult> => {
+    const c = registry(cfg, wallet!);
+    const posted = await readChainParts(cfg, snap.examId, setIndex);
+    const root = posted ? (JSON.parse(posted["index.json"] ?? "{}") as PackageIndex).root : s.index.root;
+    if (!posted) await sendTx(c, "postPackageData", [snap.examId, setIndex, packageBundleBytes(s.files)]);
+    return sendTx(c, "submitPackage", [snap.examId, setIndex, root, CHAIN_URI]);
   };
 
   const run = async (): Promise<SealResult> => {
@@ -310,7 +320,8 @@ function SealStep({
     setPending(s);
     let publish: SealResult["publish"];
     try {
-      publish = { kind: "tx", tx: await sendTx(registry(cfg, wallet), "submitPackage", [snap.examId, setIndex, s.index.root, s.uri]) };
+      const tx = cfg.mode === "live" ? await publishOnChain(s) : await sendTx(registry(cfg, wallet), "submitPackage", [snap.examId, setIndex, s.index.root, s.uri]);
+      publish = { kind: "tx", tx };
     } catch (e) {
       if (revertName(e, cfg) !== "AlreadyDone") throw e;
       publish = { kind: "already", chainRoot: onChain?.root ?? "" };

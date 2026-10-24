@@ -12,6 +12,7 @@ import { setLabel } from "@/lib/registry";
 import { usePhase } from "@/lib/usePhase";
 import { Chip, ErrorBox, Loading, Notice } from "../ui";
 import { KeyChecks, useKeyCheck } from "./KeyCheck";
+import { CentreKeyStep, JoinStep } from "./LiveCentre";
 import { OpenControls, OpenedView, type Opened } from "./Opener";
 
 const EMPTY_CENTRE = { centreId: "", name: "", address: "", privateKey: "", identity: "", recipient: "", rcHex: "" };
@@ -20,7 +21,7 @@ export function Centre() {
   const cfg = useConfig();
   const { t, locale } = useI18n();
   const { role } = useApp();
-  const { snap, b, milestones, loading, error } = usePhase();
+  const { snap, b, milestones, loading, error, reload } = usePhase();
   const [reserve, setReserve] = useState(false);
   const [opened, setOpened] = useState<Opened | null>(null);
   const centre = role?.kind === "centre" ? role.centre : undefined;
@@ -44,7 +45,7 @@ export function Centre() {
 
   const picker = (
     <Step key="pick" id="pick" title={t("actor.pickCentre")} state="current">
-      <p className="mb-3">{t("centrePage.pickBody")}</p>
+      <p className="mb-3">{t(cfg.mode === "live" ? "live.pickCentre" : "centrePage.pickBody")}</p>
       <div style={{ maxWidth: 320 }}>
         <RolePicker kinds={["centre"]} label={t("centre.choose")} />
       </div>
@@ -93,7 +94,7 @@ export function Centre() {
     if (!centre) throw new Error(t("centre.pickCentre"));
     const pkg = snap.packages.find((p) => p.setIndex === 0 && p.submitted) ?? snap.packages.find((p) => p.submitted);
     if (!pkg) throw new Error(t("centre.noPackage"));
-    const f = await fetchCentreCiphertext(cfg, pkg.uri, centre.centreId, pkg.root);
+    const f = await fetchCentreCiphertext(cfg, { ...pkg, examId: snap.examId }, centre.centreId);
     await openForCentre({ ciphertext: f.ciphertext, identity: centre.identity, client: b.client });
   };
 
@@ -108,7 +109,18 @@ export function Centre() {
     <div className="row">
       <div className="col-xl-8">
         <StepList>
-          {centre ? device : picker}
+          {!centre ? (
+            picker
+          ) : cfg.mode === "live" ? (
+            // Live: the centre publishes its key and joins itself; the device check follows once it is listed.
+            <>
+              <CentreKeyStep key={`key-${centre.centreId}`} centre={centre} />
+              <JoinStep key={`join-${centre.centreId}`} centre={centre} snap={snap} b={b} onDone={reload} />
+              {snap.centres.some((c) => same(c.centreId)) ? device : null}
+            </>
+          ) : (
+            device
+          )}
           {!e.created || !openM ? (
             <Step title={t("centrePage.whenTitle")} state="future" summary={t("comite.examNotCreated")}>
               <EmptyState icon="hourglass-bold-duotone" title={t("comite.examNotCreated")} body={t("frozen.emptyBody")} />

@@ -49,9 +49,30 @@ export interface ExamSnapshot {
   participations: ParticipationInfo[];
 }
 
-export async function readExam(cfg: AppConfig, examId: string): Promise<ExamInfo> {
-  const v = await registry(cfg).getExam(examId);
-  return {
+export async function readCentre(cfg: AppConfig, centreId: string): Promise<CentreInfo> {
+  const [pubKey, operator, name, frozen] = await registry(cfg).getCentre(centreId);
+  return { centreId, pubKey, recipient: toRecipient(pubKey), operator, name, frozen };
+}
+
+/** Every centre ever registered (allCentres view, never a log scan), with its current state. */
+export async function readAllCentres(cfg: AppConfig): Promise<CentreInfo[]> {
+  const ids: string[] = [...(await registry(cfg).allCentres())];
+  return Promise.all(ids.map((id) => readCentre(cfg, id)));
+}
+
+function toRecipient(pubKey: string): string | null {
+  if (pubKey === ZERO32) return null;
+  try {
+    return bytes32ToRecipient(pubKey);
+  } catch {
+    return null;
+  }
+}
+
+/** One examSnapshot call: exam, frozen list, packages (reserve last) and participations. */
+export async function readSnapshot(cfg: AppConfig, examId: string): Promise<ExamSnapshot> {
+  const [v, cs, ps, parts] = await registry(cfg).examSnapshot(examId);
+  const exam: ExamInfo = {
     listRoot: v.listRoot,
     centreCount: Number(v.centreCount),
     openRound: Number(v.openRound),
@@ -63,52 +84,9 @@ export async function readExam(cfg: AppConfig, examId: string): Promise<ExamInfo
     created: v.created,
     frozen: v.frozen,
   };
-}
-
-export async function readCentre(cfg: AppConfig, centreId: string): Promise<CentreInfo> {
-  const [pubKey, operator, name, frozen] = await registry(cfg).getCentre(centreId);
-  let recipient: string | null = null;
-  if (pubKey !== ZERO32) {
-    try {
-      recipient = bytes32ToRecipient(pubKey);
-    } catch {
-      recipient = null;
-    }
-  }
-  return { centreId, pubKey, recipient, operator, name, frozen };
-}
-
-/** Every centre ever registered (from CentreRegistered events), with its current state. */
-export async function readAllCentres(cfg: AppConfig): Promise<CentreInfo[]> {
-  const c = registry(cfg);
-  const logs = await c.queryFilter(c.filters.CentreRegistered!(), 0, "latest");
-  const ids: string[] = [];
-  for (const l of logs) {
-    const id = (l as unknown as { args?: { centreId?: string } }).args?.centreId ?? (l.topics[1] as string);
-    if (id && !ids.includes(id)) ids.push(id);
-  }
-  return Promise.all(ids.map((id) => readCentre(cfg, id)));
-}
-
-export async function readSnapshot(cfg: AppConfig, examId: string): Promise<ExamSnapshot> {
-  const c = registry(cfg);
-  const exam = await readExam(cfg, examId);
-  const ids: string[] = exam.frozen ? [...(await c.examCentres(examId))] : [];
-  const centres = await Promise.all(ids.map((id) => readCentre(cfg, id)));
-  const packages: PackageInfo[] = [];
-  if (exam.created) {
-    for (let i = 0; i <= exam.setCount; i++) {
-      const [root, uri, committee] = await c.packageOf(examId, i);
-      const burned = i < exam.setCount ? Boolean(await c.isBurned(examId, i)) : false;
-      packages.push({ setIndex: i, root, uri, committee, submitted: root !== ZERO32, burned });
-    }
-  }
-  const participations = await Promise.all(
-    ids.map(async (id) => {
-      const [rcCommit, tlockedRc, joined] = await c.participation(examId, id);
-      return { centreId: id, rcCommit, tlockedRc, joined } as ParticipationInfo;
-    }),
-  );
+  const centres: CentreInfo[] = [...cs].map((c) => ({ centreId: c.centreId, pubKey: c.pubKey, recipient: toRecipient(c.pubKey), operator: c.operator, name: c.name, frozen: c.frozen }));
+  const packages: PackageInfo[] = [...ps].map((p, i) => ({ setIndex: i, root: p.root, uri: p.uri, committee: p.committee, submitted: p.root !== ZERO32, burned: Boolean(p.burned) }));
+  const participations: ParticipationInfo[] = [...parts].map((p, i) => ({ centreId: centres[i]!.centreId, rcCommit: p.rcCommit, tlockedRc: p.tlockedRc, joined: p.joined }));
   return { examId, exam, centres, packages, participations };
 }
 

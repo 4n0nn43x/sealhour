@@ -1,0 +1,107 @@
+{
+  "examTitle": "Regional mock mathematics exam",
+  "subject": "Mathematics",
+  "setLabel": "Set D",
+  "questions": [
+    {
+      "id": "D-q1",
+      "text": "What is 15 × 4 - 18?",
+      "options": [
+        "42",
+        "78",
+        "60",
+        "38"
+      ]
+    },
+    {
+      "id": "D-q2",
+      "text": "What is the simplified form of the expression 5a + 3a - 2a?",
+      "options": [
+        "6a",
+        "10a",
+        "8a",
+        "6a²"
+      ]
+    },
+    {
+      "id": "D-q3",
+      "text": "What is the volume of a cuboid measuring 4 cm by 3 cm by 2 cm?",
+      "options": [
+        "24 cm³",
+        "9 cm³",
+        "18 cm³",
+        "48 cm³"
+      ]
+    },
+    {
+      "id": "D-q4",
+      "text": "What is 45,000 in scientific notation?",
+      "options": [
+        "4.5 × 10⁴",
+        "45 × 10³",
+        "4.5 × 10³",
+        "0.45 × 10⁵"
+      ]
+    },
+    {
+      "id": "D-q5",
+      "text": "A bus leaves Northgate at 7:45 and arrives in Maplewood at 9:20. How long is the journey?",
+      "options": [
+        "1 h 35 min",
+        "1 h 25 min",
+        "2 h 35 min",
+        "1 h 75 min"
+      ]
+    },
+    {
+      "id": "D-q6",
+      "text": "What is the square root of 81?",
+      "options": [
+        "9",
+        "8",
+        "40.5",
+        "18"
+      ]
+    },
+    {
+      "id": "D-q7",
+      "text": "On a map at scale 1:100,000, what real distance do 3 cm represent?",
+      "options": [
+        "3 km",
+        "30 km",
+        "300 m",
+        "0.3 km"
+      ]
+    },
+    {
+      "id": "D-q8",
+      "text": "In an isosceles triangle, the two base angles are 50° each. What is the third angle?",
+      "options": [
+        "80°",
+        "100°",
+        "50°",
+        "130°"
+      ]
+    },
+    {
+      "id": "D-q9",
+      "text": "What is the opposite of -7?",
+      "options": [
+        "7",
+        "-7",
+        "1/7",
+        "-1/7"
+      ]
+    },
+    {
+      "id": "D-q10",
+      "text": "A 25 kg bag of rice costs $87.50. What is the price of one kilogram?",
+      "options": [
+        "$3.50",
+        "$3.75",
+        "$3.25",
+        "$35"
+      ]
+    }
+  ]
+}

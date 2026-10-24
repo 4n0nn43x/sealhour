@@ -1,4 +1,5 @@
-// Demo roles: who is acting in this browser. Each role maps to a demo wallet from demo-state.json.
+// Roles: who is acting in this browser. Each role maps to a wallet of the personas in cfg.demo (demo-state.json in
+// demo mode, burners in the live solo test). Live roles of a connected wallet come from chain state (lib/live.ts).
 import type { AppConfig, DemoAccount, DemoCentre, DemoCommittee } from "./config";
 
 export type RoleKind = "office" | "committee" | "centre" | "juror";
@@ -24,11 +25,6 @@ export function listRoles(cfg: AppConfig): Role[] {
   cfg.demo.centres.forEach((c, i) => {
     roles.push({ key: `centre-${i}`, kind: "centre", name: c.name, account: c, centre: c, index: i });
   });
-  roles.push({ key: "juror", kind: "juror", name: "Juror" });
+  roles.push({ key: "juror", kind: "juror", name: "Juror", ...(cfg.demo.juror ? { account: cfg.demo.juror } : {}) });
   return roles;
-}
-
-export function findRole(cfg: AppConfig, key: string | null): Role | undefined {
-  if (!key) return undefined;
-  return listRoles(cfg).find((r) => r.key === key);
 }

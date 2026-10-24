@@ -1,0 +1,107 @@
+{
+  "examTitle": "Regional mock mathematics exam",
+  "subject": "Mathematics",
+  "setLabel": "Set C",
+  "questions": [
+    {
+      "id": "C-q1",
+      "text": "What is 125 divided by 5?",
+      "options": [
+        "25",
+        "20",
+        "30",
+        "625"
+      ]
+    },
+    {
+      "id": "C-q2",
+      "text": "What is the factorisation of 4x + 12?",
+      "options": [
+        "4(x + 3)",
+        "4(x + 12)",
+        "x(4 + 12)",
+        "12(x + 4)"
+      ]
+    },
+    {
+      "id": "C-q3",
+      "text": "What is the area of a triangle with base 10 cm and height 6 cm?",
+      "options": [
+        "30 cm²",
+        "60 cm²",
+        "16 cm²",
+        "32 cm²"
+      ]
+    },
+    {
+      "id": "C-q4",
+      "text": "What is the least common multiple of 4 and 6?",
+      "options": [
+        "12",
+        "24",
+        "2",
+        "10"
+      ]
+    },
+    {
+      "id": "C-q5",
+      "text": "What is (-3) × (-4) + 2?",
+      "options": [
+        "14",
+        "-10",
+        "10",
+        "-14"
+      ]
+    },
+    {
+      "id": "C-q6",
+      "text": "A 2 hectare maize field yields 3 tonnes per hectare. What is the total yield?",
+      "options": [
+        "6 tonnes",
+        "5 tonnes",
+        "1.5 tonnes",
+        "3 tonnes"
+      ]
+    },
+    {
+      "id": "C-q7",
+      "text": "How many edges does a cube have?",
+      "options": [
+        "12",
+        "6",
+        "8",
+        "24"
+      ]
+    },
+    {
+      "id": "C-q8",
+      "text": "What is the solution of the equation 5x = 35?",
+      "options": [
+        "x = 7",
+        "x = 30",
+        "x = 40",
+        "x = 175"
+      ]
+    },
+    {
+      "id": "C-q9",
+      "text": "Which fraction in lowest terms is equal to 0.75?",
+      "options": [
+        "3/4",
+        "75/10",
+        "7/5",
+        "15/25"
+      ]
+    },
+    {
+      "id": "C-q10",
+      "text": "What is the mean of the numbers 10, 12 and 17?",
+      "options": [
+        "13",
+        "12",
+        "39",
+        "14"
+      ]
+    }
+  ]
+}

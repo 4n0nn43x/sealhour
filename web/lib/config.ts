@@ -1,5 +1,9 @@
-// Runtime configuration, fetched once from /config.json (copied by `make demo` from app/shared).
+// Runtime configuration. Demo mode: fetched once from /config.json (copied by `make demo` from app/shared).
+// Live mode: built by lib/live.ts from /config.live.json and the testnet session; same shape, mode "live".
 import type { InterfaceAbi } from "ethers";
+
+/** demo: local Hardhat node and beacon relay, demo personas. live: Base Sepolia and drand quicknet. */
+export type Mode = "demo" | "live";
 
 export interface Deployment {
   address: string;
@@ -49,18 +53,31 @@ export interface DemoState {
   centres: DemoCentre[];
   packages: { setIndex: number; root: string; uri: string }[];
   phantom: { centreId: string; name: string };
+  /** Live solo test only: the public juror's burner wallet (the demo juror signs with a node account). */
+  juror?: DemoAccount;
 }
 
 export interface AppConfig {
+  mode: Mode;
   deployment: Deployment;
+  /** The exam and its personas: demo-state.json in demo mode; burner personas (solo test) or chain-derived
+   *  accounts without keys (connected wallet) in live mode. */
   demo: DemoState;
+  /** First relay; beaconUrls lists every relay, tried in order. */
   beaconUrl: string;
+  beaconUrls: string[];
+  /** Read RPCs, tried in order (demo: deployment.rpcUrl only). */
+  rpcUrls: string[];
   packagesBaseUrl: string;
+  /** Block explorer origin (live mode), e.g. https://sepolia.basescan.org. */
+  explorer?: string;
 }
 
 export type ConfigResult =
   | { status: "ok"; config: AppConfig }
   | { status: "missing" }
+  /** Live mode chosen but no testnet session yet: the login page sets one up. */
+  | { status: "login" }
   | { status: "invalid"; message: string };
 
 function isObj(v: unknown): v is Record<string, unknown> {
@@ -87,10 +104,14 @@ export function validateConfig(raw: unknown): AppConfig {
   const beaconUrl = typeof raw.beaconUrl === "string" ? raw.beaconUrl : typeof demo.beaconUrl === "string" ? demo.beaconUrl : "";
   if (!beaconUrl) throw new Error("config.json: beaconUrl is required");
   const packagesBaseUrl = typeof raw.packagesBaseUrl === "string" ? raw.packagesBaseUrl : "/shared";
+  const url = beaconUrl.replace(/\/+$/, "");
   return {
+    mode: "demo",
     deployment: d as unknown as Deployment,
     demo: demo as unknown as DemoState,
-    beaconUrl: beaconUrl.replace(/\/+$/, ""),
+    beaconUrl: url,
+    beaconUrls: [url],
+    rpcUrls: [d.rpcUrl],
     packagesBaseUrl: packagesBaseUrl.replace(/\/+$/, ""),
   };
 }

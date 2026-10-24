@@ -8,18 +8,19 @@ A public registry on chain freezes the list of centres, records the sealed packa
 
 ```
 app/
-  Makefile            install | test | demo | demo-cli | e2e | clean
+  Makefile            install | test | demo | demo-cli | e2e | e2e-testnet | clean
   contracts/          Hardhat 2, SealRegistry.sol (Solidity 0.8.26 via solc-js), 92 tests, scripts/deploy.js
   packages/seal/      TypeScript core (tlock-js 0.9.0 + age-encryption 0.3.1): seal/open, draw, fingerprint,
                       Merkle, base32, leak verifier. Node 22 and browser. 39 tests (vitest)
   scripts/            beacon-server.mjs (local drand compatible relay), seed-demo.mjs, demo-cli.mjs
   shared/             generated, gitignored except README: deployment.json, beacon-info.json, beacon-key.json,
                       demo-state.json (demo keys), sets/, packages/<examId>/ (sealed files, plan B for IPFS)
-  web/                Next.js 14 static export, English. Pages: /enrolment /committee /centre /public
-                      scripts/serve.mjs (static server, /shared/ falls back to app/shared), smoke.mjs, e2e-live.mjs
+  web/                Next.js 14 static export, English. Pages: /login /enrolment /committee /centre /public
+                      scripts/serve.mjs (static server, /shared/ falls back to app/shared), smoke.mjs, e2e-live.mjs,
+                      e2e-testnet.mjs (live test on Base Sepolia), live-config.mjs (writes public/config.live.json)
 ```
 
-There is no application backend. The only server is the beacon relay. The browser talks to the chain over JSON-RPC (ethers 6) and reads `/config.json` = `{ deployment, demo, beaconUrl, packagesBaseUrl: "/shared" }`, written by `make demo` from `shared/deployment.json` and `shared/demo-state.json`.
+There is no application backend. In demo mode the only server is the local beacon relay. The browser talks to the chain over JSON-RPC (ethers 6) and reads `/config.json` = `{ deployment, demo, beaconUrl, packagesBaseUrl: "/shared" }`, written by `make demo` from `shared/deployment.json` and `shared/demo-state.json`. In live mode it reads the committed `/config.live.json` instead and needs no server of its own (see "Modes" below).
 
 ## The double lock
 
@@ -39,7 +40,7 @@ ciphertext_c = tlock(open_round, age(X25519_key_of_centre_c, exam_set))
 
 - Node 22 (tested with v22.22.0), npm 10 or later (npm 9 rejects the lockfiles: use `npx -y npm@10 ci` if needed), GNU make, bash.
 - Playwright with Chromium for `make test` (smoke) and `make e2e`. The scripts use a local `playwright` package if present, otherwise the global one (`npm i -g playwright && npx playwright install chromium`).
-- Free local ports: 8545 (Hardhat), 8787 (beacon), 3000 (web, `make demo`), 3123 (smoke), 3124 (e2e). Targets refuse to start when a port is busy.
+- Free local ports: 8545 (Hardhat), 8787 (beacon), 3000 (web, `make demo`), 3123 (smoke), 3124 (e2e), 3125 (e2e-testnet). Targets refuse to start when a port is busy.
 
 ## Commands
 
@@ -52,6 +53,7 @@ All commands run from `app/`.
 | `make demo` | Browser demo on a fresh local stack, runs until Ctrl+C (see below). |
 | `make demo-cli` | Same story without a browser: beacon period 1 s, opening in 20 s, 40 checks, prints `RESULT: OK (40/40 checks passed)`. |
 | `make e2e` | Same stack as `make demo`, short (period 1 s, opening in 75 s), then `web/scripts/e2e-live.mjs` drives the four screens in Chromium (33 checks, about 2 min 10 s). Fails if any check fails. Prints `E2E OK`. |
+| `make e2e-testnet` | Live test on Base Sepolia and drand quicknet, real transactions (see "Live testnet"). Needs `.env` with a funded `DEPLOYER_KEY`; prints `E2E TESTNET OK`, the transactions with explorer links and the cost. |
 | `make clean` | Removes everything generated in `shared/` (except README.md), `web/out/` and `web/public/config.json`. |
 
 Overrides: `make demo DEMO_OPEN_IN=180`, `DEMO_PERIOD`, `E2E_OPEN_IN`, `E2E_PERIOD`, `RPC_PORT`, `BEACON_PORT`, `WEB_PORT`. Logs go to `shared/hardhat-node.log`, `shared/beacon.log`, `shared/web.log`.
@@ -88,19 +90,61 @@ cd web && NEXT_PUBLIC_SITE_URL=https://sealhour.example.org npm run build
 
 `NEXT_PUBLIC_SITE_URL` (no trailing path) becomes the `metadataBase` of `web/app/layout.tsx`: `og:image`, `twitter:image` and `og:url` start with it. Unset, it defaults to `http://localhost:3000` (the port of `npm run serve`), which is fine locally but gives previews nobody else can load.
 
-### Final demo walkthrough (4:30 script, docs/smu/32 section 9)
+## Modes: demo and live testnet
 
-| Time | Script | Where |
-|---|---|---|
-| 0:00, 0:40 | Hazaribagh 2024, bank time locks | Slides, no screen |
-| 1:10 | Frozen list of 4 centres, four committees seal, opening in 2 minutes | `/enrolment/` (frozen list), `/committee/` as committee C: list matches the announced count, seal in the browser (the seed already submitted, the chain answers AlreadyDone); `/public/` countdown and "no key exists before round N" (relay answers 425). Transactions go to local Hardhat, not Base Sepolia (see plan B). |
-| 1:40 | A juror downloads the Northgate package and fails; a fifth centre is refused | `/public/` "Juror: take the paper", download, try to open: "Too early". `/enrolment/` "Try to add a phantom centre": refused (AlreadyDone, KeyFrozen). |
-| 3:10, staged before T | Committee C saw its set on Telegram: it burns it | `/committee/` as committee C, "Burn my set" (must be done at least one round before the opening round; after that the chain says TooLate). |
-| 2:20 | The round falls. Juror: "valid signature, you are not a centre". Hillcrest, offline, pastes the signature, draws set B, prints with its fingerprint | `/public/` juror open after T. `/centre/` as Hillcrest: fetch the signature (base32 shown), then "Offline (SMS)", paste the base32, open: drawn set avoids C, fingerprinted paper, record copy indexes. |
-| 3:10 | The draw avoided C. Verifier: photo (centre 2), text before T (committee C), retyped after T (unattributed) | `/public/` after the reveal round (open + 60 s): reveal sets and `r_c`, then the three verifier presets; flag a centre. |
-| 4:00 | Limits, kit cost, pilot | Slides; reserve mode shown in `/centre/` after the reserve round if time allows. |
+The login page `/login/` (also "Switch mode or log out" in the topbar's Acting-as menu) has two doors. The choice
+persists in the browser (`sealhour.mode`); the topbar shows a "demo mode" or "live: Base Sepolia" badge, and live mode
+adds a permanent banner with the registry address linked to the explorer. Pages are the same in both modes: a network
+layer (`web/components/README.md`, "Network layer") picks the RPC, signer, beacon relays, package store and roles.
 
-The drawn set comes from the signature, so it is not always B; the script line is a narration of one run.
+- **Demo** (default): local Hardhat chain, local beacon relay, demo personas from `/config.json`. Unchanged; it works
+  without visiting the login page whenever `/config.json` is present (`make demo`). Without it, the page explains `make demo`.
+- **Live testnet**: Base Sepolia (chain 84532) and drand quicknet. Connect a browser wallet (EIP-6963 discovery,
+  switch or add Base Sepolia), then either:
+  - **Use the shared registry**: roles come from chain state for the connected address: office (`office()`),
+    committee (`committeesOf(examId)`, reserve included), centre operator (`allCentres` + `getCentre`), else public.
+  - **Solo live test**: one person plays every role in real time. The wallet sends one funding transaction to an office
+    test wallet, which pays 10 other test wallets (committees A to D, reserve R, 4 centres, juror) and deploys a fresh
+    `SealRegistry` pinned to drand quicknet. The total is shown before confirming; "Return leftover funds" sends what
+    is left back to the wallet. The test wallet keys, centre keys and `r_c` live in this browser's localStorage under
+    `sealhour.testnet.` (Base Sepolia only, refused on any other chain), with "Export the keys" and "Forget these wallets".
+
+Live flows that the demo seeds for you: the office registers centres by operator address (`registerCentreOperator`);
+each centre creates its X25519 key on its device (downloadable `.agekey` file, importable), publishes it with
+`setCentreKey`; the office freezes exactly the keys it reviewed (`freezeCentresWithKeys`); centres join with
+`joinExam` (fresh `r_c`, tlocked to the reveal round); committees publish their sealed files on chain
+(`postPackageData`, then `submitPackage(root, "chain:")`). Readers fetch them with `eth_getLogs` on exactly the
+recorded blocks (`packageDataBlocks`) and check every leaf against the root on chain; nothing scans logs from block 0.
+Beacon: api.drand.sh, api2, api3, then drand.cloudflare.com, pinned to quicknet; 425 and 404 mean "too early", and
+Cloudflare (which caches a 404 for months) is never asked for a future round.
+
+### Live testnet
+
+- Shared registry: `0x95efB9D11336bF5b654E063634750DcFFC19B2Fe` on Base Sepolia (deploy block 49755175, office
+  `0xAEF54de283ADDc2313C67b262dCe3c9e81B82866`, quicknet pin). Explorer:
+  https://sepolia.basescan.org/address/0x95efB9D11336bF5b654E063634750DcFFC19B2Fe ,
+  https://base-sepolia.blockscout.com/address/0x95efB9D11336bF5b654E063634750DcFFC19B2Fe . Sourcify (exact match):
+  https://repo.sourcify.dev/84532/0x95efB9D11336bF5b654E063634750DcFFC19B2Fe
+- `web/public/config.live.json` (committed, no secret): registry, ABI, creation bytecode (for the solo test deploy),
+  read RPCs (`base-sepolia-rpc.publicnode.com`, then `sepolia.base.org`), drand relays. Regenerate it after a new
+  deployment with `node web/scripts/live-config.mjs` (reads `shared/deployment.base-sepolia.json` and the compiled
+  artifact; also writes the sample sets in `web/public/live/sets/`).
+- Use it: `make demo` is not needed. `cd web && npm run build && npm run serve`, open http://127.0.0.1:3000/login/ with
+  a wallet extension holding a little Base Sepolia ETH.
+- Faucets: Coinbase CDP https://portal.cdp.coinbase.com/products/faucet (0.0001 ETH per request), Alchemy
+  https://www.alchemy.com/faucets/base-sepolia , list https://docs.base.org/base-chain/tools/network-faucets .
+- Costs (measured on Base Sepolia, 2026-10-24, about 0.006 gwei): one full solo run is 49 transactions, 10.5 M gas,
+  **0.000067 ETH** spent (deploy 3.04 M gas; per set postPackageData 578 to 617 k + submitPackage 103 k; joinExam
+  561 k per centre; freezeCentresWithKeys 373 k; registerCentreOperator 125 to 142 k; setCentreKey 52 k; createExam
+  156 k; burnSet 59 k; flagCentre 32 k; L1 data fees below 0.0000001 ETH in total). The solo setup first sends about
+  twice the budget (0.00025 ETH that day) and returns the rest at the end.
+- `make e2e-testnet` runs the whole solo story headless against Base Sepolia and the real quicknet beacon (about
+  8 minutes, opening 3 minutes after the exam is created, `E2E_OPEN_MIN` to change it). The funding key is
+  `DEPLOYER_KEY` from `.env`, read in the recipe's shell only: the page talks to an injected EIP-1193 wallet answered
+  in Node, so the key never reaches the browser, a file or a log. It prints every check, every transaction with its
+  explorer link, the registry address and the cost, and returns leftovers. Free dry run on a local chain:
+  `anvil --chain-id 84532 --port 8546`, then `E2E_LOCAL_RPC=http://127.0.0.1:8546 DEPLOYER_KEY=<an anvil test key>
+  node web/scripts/e2e-testnet.mjs` (real quicknet, local chain, shared registry step skipped).
 
 ## Sandbox limitations and plan B
 
@@ -110,7 +154,7 @@ The cloud sandbox blocks `api.drand.sh`, `sepolia.base.org` and the solc binary 
 - **Local Hardhat node** instead of Base Sepolia (interval mining, 1 block per second, timestamps aligned to the wall clock; set by seed-demo).
 - **solc-js 0.8.26 from npm** instead of Foundry; **static files in `shared/packages/`** instead of IPFS (integrity by the Merkle root on chain).
 
-### Switching to drand quicknet and Base Sepolia (not verified here: network blocked)
+### Switching to drand quicknet and Base Sepolia (scripts; the web live mode is described above)
 
 1. Beacon: do not start `beacon-server.mjs`. `BEACON_URL=https://api.drand.sh/52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971` (quicknet: genesis 1692803367, period 3 s, as in tlock-js defaults).
 2. Chain: put `RPC_URL` and `DEPLOYER_KEY` (throwaway testnet key) in `.env` (see `.env.example`), export them, then `cd contracts && npx hardhat run scripts/deploy.js --network baseSepolia`. On chain 84532 (or with `BEACON=quicknet`) `deploy.js` ignores `BEACON_GENESIS`, `BEACON_PERIOD` and `shared/beacon-info.json`: it pins the quicknet constants hardcoded in the script (chain hash, public key, genesis, period), checks that they hash to the quicknet chain hash, and refuses to deploy if api.drand.sh, when reachable, serves anything else. Output: `shared/deployment.base-sepolia.json`.
@@ -132,9 +176,11 @@ On the live path each centre sets its own key, so the office must freeze exactly
 
 - Demo keys are throwaway: wallet keys, centre age identities and the beacon secret are generated per run and live only in `app/shared/` (gitignored except its README) and in `web/public/config.json` (gitignored). They are served to the browser on purpose, for the demo roles. Never reuse them.
 - No mnemonic or office key is stored: the office signs through the Hardhat node's unlocked account 0 (scripts and web), and `demo-state.json` holds `office.privateKey: null`.
+- Live mode stores test wallet keys, centre identities and `r_c` in localStorage under `sealhour.testnet.` only, for
+  Base Sepolia (84532) only; export and forget buttons are on the login page. The demo stores no key.
 - Never commit `.env`. It is gitignored; `.env.example` holds placeholders only. Use a testnet-only key for `DEPLOYER_KEY`.
 
-## Known limits (docs/smu/32 section 4)
+## Known limits
 
 - At opening, each centre holds the plaintext for about 30 minutes, with candidates already confined and phones deposited.
 - A committee member keeps knowledge of their own set; four independent committees and `burnSet` reduce, not remove, that risk.

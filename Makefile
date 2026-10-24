@@ -8,6 +8,8 @@
 #                   Logs in shared/hardhat-node.log and shared/beacon.log. Exit code = demo-cli's.
 #   make e2e        same stack as demo but short (period 1 s, opening in E2E_OPEN_IN=75 s), then the
 #                   live browser test web/scripts/e2e-live.mjs. Fails if any check fails.
+#   make e2e-testnet  live test on Base Sepolia and drand quicknet (real transactions, about 8 min): solo test
+#                   funded by DEPLOYER_KEY from .env (loaded here, never printed), web/scripts/e2e-testnet.mjs.
 #   make clean      remove generated files: app/shared (except README.md), web/out, web/public/config.json
 # Overrides: DEMO_OPEN_IN, DEMO_PERIOD (demo and demo-cli), E2E_OPEN_IN, E2E_PERIOD, RPC_PORT, BEACON_PORT, WEB_PORT.
 SHELL := /bin/bash
@@ -27,10 +29,10 @@ E2E_OPEN_IN ?= 75
 # web/scripts/e2e-live.mjs serves the site itself on this fixed port.
 E2E_WEB_PORT := 3124
 
-.PHONY: help install test demo demo-cli e2e clean
+.PHONY: help install test demo demo-cli e2e e2e-testnet clean
 
 help:
-	@sed -n '1,12p' Makefile
+	@sed -n '1,14p' Makefile
 
 # Recipes run as one bash script each (.ONESHELL): every step is a subshell so cd does not leak.
 install:
@@ -136,6 +138,13 @@ demo:
 e2e:
 	@$(call START_STACK,$(E2E_PERIOD),$(E2E_OPEN_IN),$(E2E_WEB_PORT))
 	(cd web && node scripts/e2e-live.mjs public/config.json ../shared)
+
+# .env is read in this recipe's shell only: DEPLOYER_KEY reaches Node through the environment, never a file or a log.
+e2e-testnet:
+	@if [ ! -f .env ]; then echo ".env with DEPLOYER_KEY (funded Base Sepolia key) is required, see .env.example" >&2; exit 1; fi
+	if [ ! -f web/out/index.html ]; then (cd web && npm run build); fi
+	set -a; . ./.env; set +a
+	(cd web && node scripts/e2e-testnet.mjs)
 
 clean:
 	find shared -mindepth 1 -maxdepth 1 ! -name README.md -exec rm -rf {} +
