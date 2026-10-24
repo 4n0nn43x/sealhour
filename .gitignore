@@ -1,0 +1,9 @@
+node_modules/
+.env
+.DS_Store
+*.tsbuildinfo
+shared/*
+!shared/README.md
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
