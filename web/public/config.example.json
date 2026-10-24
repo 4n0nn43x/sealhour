@@ -1,0 +1,41 @@
+{
+  "_comment": "Shape of public/config.json, written by `make demo` (gitignored). deployment = app/shared/deployment.json, demo = app/shared/demo-state.json. Placeholder values only, no keys.",
+  "deployment": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "abi": [],
+    "chainId": 31337,
+    "rpcUrl": "http://127.0.0.1:8545",
+    "genesisTime": 0,
+    "period": 3,
+    "office": "0x0000000000000000000000000000000000000000",
+    "deployedAt": "2026-01-01T00:00:00.000Z"
+  },
+  "demo": {
+    "examId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "examTitle": "Examen blanc régional de mathématiques",
+    "subject": "Mathématiques",
+    "beaconUrl": "http://127.0.0.1:8787",
+    "rpcUrl": "http://127.0.0.1:8545",
+    "contract": "0x0000000000000000000000000000000000000000",
+    "rounds": { "open": 0, "reveal": 0, "reserveOpen": 0, "reserveReveal": 0 },
+    "announcedCentreCount": 4,
+    "office": { "address": "0x...", "privateKey": "<demo key from demo-state.json>" },
+    "committees": [{ "setIndex": 0, "label": "A", "address": "0x...", "privateKey": "<demo key>" }],
+    "reserveCommittee": { "setIndex": 4, "label": "R", "address": "0x...", "privateKey": "<demo key>" },
+    "centres": [
+      {
+        "centreId": "0x...",
+        "name": "Cotonou",
+        "address": "0x...",
+        "privateKey": "<demo key>",
+        "identity": "<AGE-SECRET-KEY-1... demo identity>",
+        "recipient": "age1...",
+        "rcHex": "0x..."
+      }
+    ],
+    "packages": [{ "setIndex": 0, "root": "0x...", "uri": "packages/<examId>/set-0/index.json" }],
+    "phantom": { "centreId": "0x...", "name": "Centre fantôme" }
+  },
+  "beaconUrl": "http://127.0.0.1:8787",
+  "packagesBaseUrl": "/shared"
+}
