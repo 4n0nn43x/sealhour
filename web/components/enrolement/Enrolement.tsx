@@ -42,10 +42,14 @@ export function Enrolement() {
 
   return (
     <>
-      <div className="toolbar">
-        <BeaconBar b={b} />
+      <div className="card">
+        <div className="card-body d-flex flex-wrap align-items-center gap-3">
+          <BeaconBar b={b} />
+        </div>
+        <div className="card-body border-top pb-0">
+          <ExamPicker {...exam} title={cfg.demo.examTitle} />
+        </div>
       </div>
-      <ExamPicker {...exam} title={cfg.demo.examTitle} />
       <Section title={t("enrol.centresTitle")} id="centres" aside={<Button variant="secondary" onClick={refresh}>{t("common.reload")}</Button>}>
         <ErrorBox error={allError} cfg={cfg} />
         <CentresTable centres={all} />

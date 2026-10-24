@@ -74,12 +74,12 @@ export function Verifier({ snap, b, data, onLeak }: { snap: ExamSnapshot; b: Bea
       <p>{t("verifier.body")}</p>
       {!data ? <Notice tone="info">{t("verifier.needReveal")}</Notice> : null}
       {presets.length ? (
-        <div className="row" role="group" aria-label={t("verifier.presets")}>
+        <div className="d-flex flex-wrap align-items-center gap-2 mb-3" role="group" aria-label={t("verifier.presets")}>
           {presets.map((p) => (
             <button
               key={p.key}
               type="button"
-              className="btn btn-secondary btn-small"
+              className="btn btn-light btn-sm"
               data-testid={`preset-${p.key}`}
               onClick={() => {
                 setText(p.text);
@@ -93,10 +93,10 @@ export function Verifier({ snap, b, data, onLeak }: { snap: ExamSnapshot; b: Bea
         </div>
       ) : null}
       <Field label={t("verifier.text")} htmlFor="leak">
-        <textarea id="leak" rows={8} value={text} onChange={(e) => setText(e.target.value)} />
+        <textarea id="leak" className="form-control" rows={8} value={text} onChange={(e) => setText(e.target.value)} />
       </Field>
       <Field label={t("verifier.seenAt")} htmlFor="seen-at" hint={t("verifier.seenHint")}>
-        <input id="seen-at" type="datetime-local" step={1} value={seenAt} onChange={(e) => setSeenAt(e.target.value)} />
+        <input id="seen-at" className="form-control w-auto" type="datetime-local" step={1} value={seenAt} onChange={(e) => setSeenAt(e.target.value)} />
       </Field>
       <Button onClick={() => void run()} busy={act.busy} disabled={!data || !text.trim()} testId="verify">
         {t("verifier.run")}

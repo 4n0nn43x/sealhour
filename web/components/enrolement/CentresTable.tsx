@@ -16,11 +16,11 @@ export function CentresTable({
   onToggle?: (id: string) => void;
 }) {
   const { t } = useI18n();
-  if (centres.length === 0) return <p className="muted">{t("enrol.noCentres")}</p>;
+  if (centres.length === 0) return <p className="text-muted">{t("enrol.noCentres")}</p>;
   return (
-    <div className="table-wrap">
-      <table data-testid="centres-table">
-        <thead>
+    <div className="table-responsive">
+      <table className="table table-sm table-hover align-middle mb-0" data-testid="centres-table">
+        <thead className="table-light">
           <tr>
             {selectable ? <th scope="col">{t("enrol.pick")}</th> : null}
             <th scope="col">{t("common.name")}</th>
@@ -35,6 +35,7 @@ export function CentresTable({
               {selectable ? (
                 <td>
                   <input
+                    className="form-check-input"
                     type="checkbox"
                     aria-label={c.name}
                     checked={selected?.includes(c.centreId) ?? false}
@@ -43,8 +44,8 @@ export function CentresTable({
                 </td>
               ) : null}
               <td>
-                {c.name || <span className="muted">-</span>}
-                <div className="sub">
+                {c.name || <span className="text-muted">-</span>}
+                <div className="small">
                   <Hex value={c.centreId} />
                 </div>
               </td>

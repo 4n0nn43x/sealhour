@@ -78,10 +78,10 @@ export function OpenPanel({
       <Button onClick={() => void open()} busy={act.busy} disabled={blocked} testId="open">
         {t("centre.open")}
       </Button>
-      {blocked ? <p className="hint">{blockedReason ?? t("centre.blocked")}</p> : null}
+      {blocked ? <p className="form-text">{blockedReason ?? t("centre.blocked")}</p> : null}
       <ErrorBox error={act.error} cfg={cfg} />
       {r ? (
-        <div className="stack" data-testid="opened">
+        <div className="vstack gap-1 mt-3" data-testid="opened">
           <Notice tone="ok">
             {reserve
               ? t("centre.reserveSet", { label: setLabel(cfg, r.setIndex, snap.exam.setCount) })
@@ -93,13 +93,13 @@ export function OpenPanel({
           <p>
             <Chip ok={r.leafOk}>{t("centre.leafOk")}</Chip> <Chip ok={r.rootOk}>{t("centre.rootOk")}</Chip>
           </p>
-          <div className="grid-2">
+          <div className="row row-cols-1 row-cols-md-2">
             <Field label={t("centre.copies")} htmlFor="copies" hint={t("centre.copiesHint")}>
-              <input id="copies" type="number" min={1} value={copies} onChange={(e) => setCopies(Math.max(1, Math.floor(Number(e.target.value) || 1)))} />
+              <input id="copies" className="form-control" type="number" min={1} value={copies} onChange={(e) => setCopies(Math.max(1, Math.floor(Number(e.target.value) || 1)))} />
             </Field>
-            <div className="record" data-testid="record-copies">
+            <div className="mb-3" data-testid="record-copies">
               <strong>{t("centre.recordCopies")}</strong>
-              <p className="big">{record.join(", ")}</p>
+              <p className="big fs-3 fw-bold tabular mb-0">{record.join(", ")}</p>
             </div>
           </div>
           <Paper

@@ -78,7 +78,7 @@ export function RevealPanel({ snap, b, data, onData }: { snap: ExamSnapshot; b: 
       </Button>
       <ErrorBox error={act.error} cfg={cfg} />
       {d ? (
-        <div className="stack" data-testid="revealed">
+        <div className="vstack gap-1 mt-3" data-testid="revealed">
           <Notice tone="info">
             {t("public.drawnIs", {
               label: setLabel(cfg, d.drawnSet),
@@ -86,7 +86,7 @@ export function RevealPanel({ snap, b, data, onData }: { snap: ExamSnapshot; b: 
             })}
           </Notice>
           <h3>{t("public.publicCopies")}</h3>
-          <ul className="checks">
+          <ul className="list-unstyled vstack gap-2 mb-3">
             {d.sets.map((s) => (
               <li key={s.setIndex}>
                 <Chip ok>{t("public.opened")}</Chip> {setLabel(cfg, s.setIndex, snap.exam.setCount)} : {s.set.setLabel}, {t("public.questions", { n: s.set.questions.length })}
@@ -99,7 +99,7 @@ export function RevealPanel({ snap, b, data, onData }: { snap: ExamSnapshot; b: 
             ))}
           </ul>
           <h3>{t("public.rcTitle")}</h3>
-          <ul className="checks" data-testid="rc-checks">
+          <ul className="list-unstyled vstack gap-2 mb-3" data-testid="rc-checks">
             {d.centres.map((c) => (
               <li key={c.centreId}>
                 <Chip ok={c.ok}>{c.ok ? "OK" : "FAIL"}</Chip> {centreName(cfg, snap, c.centreId)} {c.message ? `: ${c.message}` : ""}

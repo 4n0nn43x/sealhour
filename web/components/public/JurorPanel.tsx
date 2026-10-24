@@ -46,10 +46,10 @@ export function JurorPanel({ snap, b }: { snap: ExamSnapshot; b: BeaconState }) 
   return (
     <Section title={t("juror.title")} id="juror">
       <p>{t("juror.body", { name: target.name })}</p>
-      <div className="row">
-        <label>
-          {t("public.set")}{" "}
-          <select value={setIndex} onChange={(e) => (setSetIndex(Number(e.target.value)), dl.reset(), tryOpen.reset())}>
+      <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <label className="d-inline-flex align-items-center gap-2 mb-0">
+          {t("public.set")}
+          <select className="form-select w-auto" value={setIndex} onChange={(e) => (setSetIndex(Number(e.target.value)), dl.reset(), tryOpen.reset())}>
             {Array.from({ length: snap.exam.setCount }, (_, i) => (
               <option key={i} value={i}>
                 {setLabel(cfg, i)}
@@ -66,7 +66,7 @@ export function JurorPanel({ snap, b }: { snap: ExamSnapshot; b: BeaconState }) 
       </div>
       <ErrorBox error={dl.error} cfg={cfg} />
       {dl.result ? (
-        <p className="muted">
+        <p className="text-muted">
           {t("juror.downloaded", { file: dl.result.file, n: dl.result.ciphertext.length })} <Chip ok={dl.result.leafOk && dl.result.rootOk}>{t("centre.rootOk")}</Chip>
         </p>
       ) : null}

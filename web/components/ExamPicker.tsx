@@ -20,8 +20,8 @@ export function ExamPicker({ text, setText, examId, title }: { text: string; set
   const { t } = useI18n();
   return (
     <Field label={t("exam.idLabel")} htmlFor="exam-id" hint={t("exam.idHint")}>
-      <input id="exam-id" value={text} onChange={(e) => setText(e.target.value)} />
-      <p className="muted">
+      <input id="exam-id" className="form-control" value={text} onChange={(e) => setText(e.target.value)} />
+      <p className="text-muted mb-0 mt-1">
         {title ? <strong>{title} </strong> : null}
         <Hex value={examId} head={10} tail={8} />
       </p>

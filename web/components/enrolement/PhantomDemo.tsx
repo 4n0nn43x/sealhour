@@ -60,7 +60,7 @@ export function PhantomDemo({ snap, onDone }: { snap: ExamSnapshot; onDone: () =
       </Button>
       <ErrorBox error={act.error} cfg={cfg} />
       {act.result ? (
-        <ul className="attempts" data-testid="phantom-result">
+        <ul className="list-unstyled mt-3 mb-0" data-testid="phantom-result">
           {act.result.map((a) => (
             <li key={a.label}>
               <Notice tone={a.refused ? "ok" : "error"}>

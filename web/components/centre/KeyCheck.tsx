@@ -45,7 +45,7 @@ export function KeyCheck({ v }: { v: KeyVerdict | null }) {
   if (!v) return null;
   return (
     <Section title={t("centre.keyTitle")} id="key" aside={<Chip ok={v.keyOk && v.listed}>{v.keyOk && v.listed ? t("centre.keyOk") : t("centre.keyBad")}</Chip>}>
-      <ul className="checks">
+      <ul className="list-unstyled vstack gap-2 mb-3">
         <li>
           <Chip ok={v.listed}>{v.listed ? t("common.yes") : t("common.no")}</Chip> {t("centre.listed")}
         </li>

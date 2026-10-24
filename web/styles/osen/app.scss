@@ -1,0 +1,43 @@
+/*
+Template Name: Osen - Responsive Bootstrap 5 Admin Dashboard
+Version: 1.0.0
+Author: Coderthemes
+Email: support@coderthemes.com
+File: App Css File
+*/
+
+
+// Core files
+// SealHour port: Bootstrap resolves from web/node_modules; only the partials the app uses are kept.
+@import "../../node_modules/bootstrap/scss/functions";
+@import "../../node_modules/bootstrap/scss/variables";
+
+@import "variables";
+@import "variables-dark";
+@import "variables-custom";
+@import "theme-default";
+
+@import "../../node_modules/bootstrap/scss/bootstrap";
+
+// Structure
+@import "structure/topbar";
+@import "structure/sidenav";
+@import "structure/layout";
+@import "structure/footer";
+
+
+// Components
+@import "components/alert";
+@import "components/avatar";
+@import "components/breadcrumb";
+@import "components/buttons";
+@import "components/badge";
+@import "components/card";
+@import "components/forms";
+@import "components/nav";
+@import "components/print";
+@import "components/reboot";
+@import "components/tables";
+
+// Icons
+@import "icons";

@@ -38,11 +38,11 @@ export function SignaturePanel({ round, b, onSignature }: { round: number; b: Be
 
   return (
     <Section title={t("centre.sigTitle")} id="signature">
-      <div className="tabs" role="tablist" aria-label={t("centre.sigTitle")}>
-        <button type="button" role="tab" aria-selected={mode === "relay"} className={mode === "relay" ? "tab active" : "tab"} onClick={() => setMode("relay")}>
+      <div className="nav nav-tabs mb-3" role="tablist" aria-label={t("centre.sigTitle")}>
+        <button type="button" role="tab" aria-selected={mode === "relay"} className={mode === "relay" ? "nav-link active" : "nav-link"} onClick={() => setMode("relay")}>
           {t("centre.modeRelay")}
         </button>
-        <button type="button" role="tab" aria-selected={mode === "offline"} className={mode === "offline" ? "tab active" : "tab"} onClick={() => setMode("offline")}>
+        <button type="button" role="tab" aria-selected={mode === "offline"} className={mode === "offline" ? "nav-link active" : "nav-link"} onClick={() => setMode("offline")}>
           {t("centre.modeOffline")}
         </button>
       </div>
@@ -52,23 +52,23 @@ export function SignaturePanel({ round, b, onSignature }: { round: number; b: Be
           <Button onClick={() => void fromRelay()} busy={act.busy} disabled={!reached} testId="fetch-signature">
             {t("centre.fetchSig")}
           </Button>
-          {!reached ? <p className="hint">{t("centre.waitRound", { round })}</p> : null}
+          {!reached ? <p className="form-text">{t("centre.waitRound", { round })}</p> : null}
         </>
       ) : (
         <>
           <p>{t("centre.offlineBody")}</p>
           <Field label={t("centre.pasteLabel")} htmlFor="sig-b32">
-            <textarea id="sig-b32" rows={3} value={pasted} onChange={(e) => setPasted(e.target.value)} className="mono" spellCheck={false} />
+            <textarea id="sig-b32" rows={3} value={pasted} onChange={(e) => setPasted(e.target.value)} className="form-control font-monospace" spellCheck={false} />
           </Field>
           <Button onClick={() => void fromPaste()} busy={act.busy} disabled={!pasted.trim()} testId="paste-signature">
             {t("centre.checkSig")}
           </Button>
-          {b.infoSource === "cache" ? <p className="hint">{t("centre.cachedInfo")}</p> : null}
+          {b.infoSource === "cache" ? <p className="form-text">{t("centre.cachedInfo")}</p> : null}
         </>
       )}
       <ErrorBox error={act.error} cfg={cfg} />
       {act.result ? (
-        <div className="stack" data-testid="signature-ok">
+        <div className="vstack gap-1 mt-3" data-testid="signature-ok">
           <Notice tone="ok">
             {t("centre.sigVerified", { round })} <Hex value={act.result} head={10} tail={8} />
           </Notice>

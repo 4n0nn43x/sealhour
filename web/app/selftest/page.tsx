@@ -80,7 +80,7 @@ export default function SelfTest() {
   }, []);
   return (
     <Page title="Self test" needsConfig={false}>
-      <p data-testid="selftest" className={status === "FAIL" ? "bad" : undefined}>
+      <p data-testid="selftest" className={status === "FAIL" ? "text-danger" : undefined}>
         {status}
       </p>
       <pre className="code">{lines.join("\n")}</pre>

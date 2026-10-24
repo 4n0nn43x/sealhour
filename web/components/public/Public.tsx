@@ -25,11 +25,13 @@ export function Public() {
 
   return (
     <>
-      <div className="toolbar">
-        <BeaconBar b={b} />
-        <Button variant="secondary" onClick={reload}>
-          {t("common.reload")}
-        </Button>
+      <div className="card">
+        <div className="card-body d-flex flex-wrap align-items-center gap-3">
+          <BeaconBar b={b} />
+          <Button variant="secondary" onClick={reload}>
+            {t("common.reload")}
+          </Button>
+        </div>
       </div>
       {loading && !snap ? <Loading /> : null}
       <ErrorBox error={error} cfg={cfg} />

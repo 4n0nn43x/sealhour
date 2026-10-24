@@ -32,23 +32,27 @@ export function Comite() {
 
   return (
     <>
-      <div className="toolbar">
-        <RoleSelect kinds={["committee"]} label={t("comite.choose")} />
-        <BeaconBar b={b} />
-        <Button variant="secondary" onClick={reload}>
-          {t("common.reload")}
-        </Button>
+      <div className="card">
+        <div className="card-body d-flex flex-wrap align-items-center gap-3">
+          <RoleSelect kinds={["committee"]} label={t("comite.choose")} />
+          <BeaconBar b={b} />
+          <Button variant="secondary" onClick={reload}>
+            {t("common.reload")}
+          </Button>
+        </div>
+        <div className="card-body border-top pb-0">
+          <ExamPicker {...exam} title={cfg.demo.examTitle} />
+        </div>
       </div>
-      <ExamPicker {...exam} title={cfg.demo.examTitle} />
       {!committee ? <Notice tone="info">{t("comite.pickCommittee")}</Notice> : null}
       {loading && !snap ? <Loading /> : null}
       <ErrorBox error={error} cfg={cfg} />
       {snap && committee ? (
         <>
-          <p className="muted">
+          <p className="text-muted">
             {t("comite.acting", { label: setLabel(cfg, setIndex, snap.exam.setCount) })} <Hex value={committee.address} />{" "}
             {onChainCommittee && onChainCommittee.toLowerCase() !== committee.address.toLowerCase() ? (
-              <strong className="bad">{t("comite.notThisCommittee")}</strong>
+              <strong className="text-danger">{t("comite.notThisCommittee")}</strong>
             ) : null}
           </p>
           {!snap.exam.created ? <Notice tone="warn">{t("comite.examNotCreated")}</Notice> : null}

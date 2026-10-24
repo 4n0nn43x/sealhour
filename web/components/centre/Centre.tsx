@@ -38,16 +38,28 @@ export function Centre() {
 
   return (
     <>
-      <div className="toolbar">
-        <RoleSelect kinds={["centre"]} label={t("centre.choose")} />
-        <label className="switch">
-          <input type="checkbox" checked={reserve} onChange={(e) => setReserve(e.target.checked)} data-testid="reserve-toggle" />
-          <span>{t("centre.reserveMode")}</span>
-        </label>
-        <BeaconBar b={b} />
-        <Button variant="secondary" onClick={reload}>
-          {t("common.reload")}
-        </Button>
+      <div className="card">
+        <div className="card-body d-flex flex-wrap align-items-center gap-3">
+          <RoleSelect kinds={["centre"]} label={t("centre.choose")} />
+          <div className="form-check form-switch mb-0">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              role="switch"
+              id="reserve-toggle"
+              checked={reserve}
+              onChange={(e) => setReserve(e.target.checked)}
+              data-testid="reserve-toggle"
+            />
+            <label className="form-check-label" htmlFor="reserve-toggle">
+              {t("centre.reserveMode")}
+            </label>
+          </div>
+          <BeaconBar b={b} />
+          <Button variant="secondary" onClick={reload}>
+            {t("common.reload")}
+          </Button>
+        </div>
       </div>
       {!centre ? <Notice tone="info">{t("centre.pickCentre")}</Notice> : null}
       {loading && !snap ? <Loading /> : null}

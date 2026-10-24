@@ -56,7 +56,7 @@ export function FreezeList({ snap, all, onDone }: { snap: ExamSnapshot; all: Cen
         <>
           <p>{t("enrol.pickCentres")}</p>
           <CentresTable centres={all} selectable selected={selected} onToggle={toggle} />
-          <p className="muted">
+          <p className="text-muted">
             {t("enrol.selectedCount", { n: selected.length })} {root ? <Hex value={root} head={10} tail={8} /> : null}
           </p>
           {selected.length !== announced ? <Notice tone="warn">{t("enrol.selectedMismatch", { n: announced })}</Notice> : null}
@@ -65,7 +65,7 @@ export function FreezeList({ snap, all, onDone }: { snap: ExamSnapshot; all: Cen
       <Button onClick={() => void freeze()} busy={tx.busy} disabled={frozen || selected.length === 0} testId="freeze" title={frozen ? t("enrol.alreadyFrozen") : undefined}>
         {t("enrol.freeze")}
       </Button>
-      {frozen ? <p className="hint">{t("enrol.alreadyFrozen")}</p> : null}
+      {frozen ? <p className="form-text">{t("enrol.alreadyFrozen")}</p> : null}
       <ErrorBox error={tx.error} cfg={cfg} />
       <TxOutcome tx={tx.result} />
     </Section>

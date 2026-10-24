@@ -35,9 +35,9 @@ export function Overview({ snap, b }: { snap: ExamSnapshot; b: BeaconState }) {
         </dl>
       </Section>
       <Section title={t("public.centresTitle")} id="pub-centres">
-        <div className="table-wrap">
-          <table data-testid="public-centres">
-            <thead>
+        <div className="table-responsive">
+          <table className="table table-sm table-hover align-middle mb-0" data-testid="public-centres">
+            <thead className="table-light">
               <tr>
                 <th scope="col">{t("common.name")}</th>
                 <th scope="col">{t("common.key")}</th>
@@ -66,9 +66,9 @@ export function Overview({ snap, b }: { snap: ExamSnapshot; b: BeaconState }) {
       {e.created ? (
         <>
           <Section title={t("public.roundsTitle")} id="rounds">
-            <div className="table-wrap">
-              <table>
-                <thead>
+            <div className="table-responsive">
+              <table className="table table-sm table-hover align-middle mb-0">
+                <thead className="table-light">
                   <tr>
                     <th scope="col">{t("public.what")}</th>
                     <th scope="col">{t("public.round")}</th>
@@ -92,9 +92,9 @@ export function Overview({ snap, b }: { snap: ExamSnapshot; b: BeaconState }) {
             </div>
           </Section>
           <Section title={t("public.packagesTitle")} id="packages">
-            <div className="table-wrap">
-              <table data-testid="public-packages">
-                <thead>
+            <div className="table-responsive">
+              <table className="table table-sm table-hover align-middle mb-0" data-testid="public-packages">
+                <thead className="table-light">
                   <tr>
                     <th scope="col">{t("public.set")}</th>
                     <th scope="col">{t("public.root")}</th>

@@ -1,5 +1,6 @@
 "use client";
-// Small presentational building blocks shared by the screens.
+// Small presentational building blocks shared by the screens (Bootstrap and template classes).
+// The notice-*, chip-* (and .big in OpenPanel) class names are kept as stable hooks for scripts/e2e-live.mjs.
 import type { ReactNode } from "react";
 import { shortHex, type TxResult } from "@/lib/chain";
 import { explainError } from "@/lib/errors";
@@ -9,18 +10,22 @@ import type { AppConfig } from "@/lib/config";
 export function Section({ title, children, id, aside }: { title: string; children: ReactNode; id?: string; aside?: ReactNode }) {
   return (
     <section className="card" id={id} aria-labelledby={id ? `${id}-title` : undefined}>
-      <div className="card-head">
-        <h2 id={id ? `${id}-title` : undefined}>{title}</h2>
+      <div className="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <h2 className="header-title" id={id ? `${id}-title` : undefined}>
+          {title}
+        </h2>
         {aside}
       </div>
-      {children}
+      <div className="card-body pt-0">{children}</div>
     </section>
   );
 }
 
+const ALERT = { info: "info", ok: "success", warn: "warning", error: "danger" } as const;
+
 export function Notice({ tone = "info", children, testId }: { tone?: "info" | "ok" | "warn" | "error"; children: ReactNode; testId?: string }) {
   return (
-    <div className={`notice notice-${tone}`} role={tone === "error" ? "alert" : "status"} data-testid={testId}>
+    <div className={`alert alert-${ALERT[tone]} text-break notice notice-${tone}`} role={tone === "error" ? "alert" : "status"} data-testid={testId}>
       {children}
     </div>
   );
@@ -36,6 +41,8 @@ export function ErrorBox({ error, cfg, prefix }: { error: unknown; cfg?: AppConf
     </Notice>
   );
 }
+
+const BTN = { primary: "btn-primary", secondary: "btn-light", danger: "btn-danger" } as const;
 
 export function Button({
   onClick,
@@ -58,20 +65,27 @@ export function Button({
   return (
     <button
       type="button"
-      className={`btn btn-${variant}`}
+      className={`btn ${BTN[variant]}`}
       onClick={onClick}
       disabled={disabled || busy}
       aria-busy={busy || undefined}
       title={title}
       data-testid={testId}
     >
-      {busy ? t("common.working") : children}
+      {busy ? (
+        <>
+          <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
+          {t("common.working")}
+        </>
+      ) : (
+        children
+      )}
     </button>
   );
 }
 
 export function Hex({ value, head = 6, tail = 4 }: { value: string | undefined | null; head?: number; tail?: number }) {
-  if (!value) return <span className="muted">-</span>;
+  if (!value) return <span className="text-muted">-</span>;
   return (
     <code className="hex" title={value}>
       {shortHex(value, head, tail)}
@@ -80,7 +94,7 @@ export function Hex({ value, head = 6, tail = 4 }: { value: string | undefined |
 }
 
 export function Chip({ ok, children }: { ok: boolean | null; children: ReactNode }) {
-  const cls = ok === null ? "chip" : ok ? "chip chip-ok" : "chip chip-bad";
+  const cls = ok === null ? "badge badge-soft-secondary chip" : ok ? "badge badge-soft-success chip chip-ok" : "badge badge-soft-danger chip chip-bad";
   return <span className={cls}>{children}</span>;
 }
 
@@ -97,7 +111,8 @@ export function TxOutcome({ tx }: { tx: TxResult | undefined }) {
 export function Loading({ label }: { label?: string }) {
   const { t } = useI18n();
   return (
-    <p className="muted" role="status" aria-live="polite">
+    <p className="text-muted" role="status" aria-live="polite">
+      <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
       {label ?? t("common.loading")}
     </p>
   );
@@ -105,10 +120,12 @@ export function Loading({ label }: { label?: string }) {
 
 export function Field({ label, children, hint, htmlFor }: { label: string; children: ReactNode; hint?: string; htmlFor?: string }) {
   return (
-    <div className="field">
-      <label htmlFor={htmlFor}>{label}</label>
+    <div className="mb-3">
+      <label className="form-label" htmlFor={htmlFor}>
+        {label}
+      </label>
       {children}
-      {hint ? <p className="hint">{hint}</p> : null}
+      {hint ? <div className="form-text">{hint}</div> : null}
     </div>
   );
 }

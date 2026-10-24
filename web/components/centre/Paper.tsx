@@ -24,7 +24,7 @@ export function Paper({
   const { t } = useI18n();
   return (
     <>
-      <div className="row">
+      <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
         <button type="button" className="btn btn-primary" onClick={() => window.print()}>
           {t("centre.print")}
         </button>

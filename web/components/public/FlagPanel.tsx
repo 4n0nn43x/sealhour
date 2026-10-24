@@ -35,10 +35,10 @@ export function FlagPanel({ snap, b, evidence, suggested }: { snap: ExamSnapshot
     <Section title={t("flag.title")} id="flag">
       <p>{t("flag.body")}</p>
       {!revealed ? <Notice tone="info">{t("flag.wait", { round: snap.exam.revealRound })}</Notice> : null}
-      <div className="row">
-        <label>
-          {t("flag.centre")}{" "}
-          <select value={centreId} onChange={(e) => setCentreId(e.target.value)}>
+      <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <label className="d-inline-flex align-items-center gap-2 mb-0">
+          {t("flag.centre")}
+          <select className="form-select w-auto" value={centreId} onChange={(e) => setCentreId(e.target.value)}>
             {snap.centres.map((c) => (
               <option key={c.centreId} value={c.centreId}>
                 {c.name}
@@ -46,14 +46,14 @@ export function FlagPanel({ snap, b, evidence, suggested }: { snap: ExamSnapshot
             ))}
           </select>
         </label>
-        <span className="muted">
+        <span className="text-muted">
           {t("flag.evidence")} <Hex value={evidenceHash} />
         </span>
       </div>
       <Button variant="danger" onClick={() => void flag()} busy={tx.busy} disabled={!centreId} testId="flag">
         {t("flag.button")}
       </Button>
-      {!wallet ? <p className="hint">{t("flag.jurorSigner")}</p> : null}
+      {!wallet ? <p className="form-text">{t("flag.jurorSigner")}</p> : null}
       <ErrorBox error={tx.error} cfg={cfg} />
       <TxOutcome tx={tx.result} />
     </Section>

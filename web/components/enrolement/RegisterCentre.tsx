@@ -51,12 +51,12 @@ export function RegisterCentre({ onDone }: { onDone: () => void }) {
 
   return (
     <Section title={t("enrol.registerTitle")} id="register">
-      <div className="grid-2">
+      <div className="row row-cols-1 row-cols-md-2">
         <Field label={t("common.name")} htmlFor="c-name">
-          <input id="c-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Westbrook" />
+          <input id="c-name" className="form-control" value={name} onChange={(e) => setName(e.target.value)} placeholder="Westbrook" />
         </Field>
         <Field label={t("common.operator")} htmlFor="c-op" hint={t("enrol.operatorHint")}>
-          <input id="c-op" value={operator} onChange={(e) => setOperator(e.target.value)} placeholder="0x..." list="demo-operators" />
+          <input id="c-op" className="form-control" value={operator} onChange={(e) => setOperator(e.target.value)} placeholder="0x..." list="demo-operators" />
           <datalist id="demo-operators">
             {cfg.demo.centres.map((c) => (
               <option key={c.address} value={c.address}>
@@ -67,8 +67,8 @@ export function RegisterCentre({ onDone }: { onDone: () => void }) {
         </Field>
       </div>
       <Field label={t("enrol.recipient")} htmlFor="c-key" hint={t("enrol.recipientHint")}>
-        <div className="row">
-          <input id="c-key" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="age1..." className="grow" />
+        <div className="input-group">
+          <input id="c-key" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="age1..." className="form-control" />
           <Button variant="secondary" onClick={() => void generate()} busy={gen.busy}>
             {t("enrol.generateKey")}
           </Button>
@@ -78,12 +78,12 @@ export function RegisterCentre({ onDone }: { onDone: () => void }) {
       {identity ? (
         <Notice tone="warn">
           {t("enrol.identityWarning")}
-          <pre className="code wrap-anywhere">{identity}</pre>
+          <pre className="code mb-0 mt-2">{identity}</pre>
         </Notice>
       ) : null}
       <ErrorBox error={gen.error} cfg={cfg} />
       {centreId ? (
-        <p className="muted">
+        <p className="text-muted">
           {t("enrol.centreId")} <Hex value={centreId} />
         </p>
       ) : null}

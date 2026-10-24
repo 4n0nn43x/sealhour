@@ -103,25 +103,25 @@ export function SealPanel({
       <Button onClick={() => void doSeal()} busy={seal.busy} disabled={!canSeal || !set} title={refusal} testId="seal">
         {t("comite.seal", { n: snap.centres.length })}
       </Button>
-      {!canSeal && refusal ? <p className="hint">{refusal}</p> : null}
-      {seal.busy ? <p className="muted">{t("comite.sealing")}</p> : null}
+      {!canSeal && refusal ? <p className="form-text">{refusal}</p> : null}
+      {seal.busy ? <p className="text-muted">{t("comite.sealing")}</p> : null}
       <ErrorBox error={seal.error} cfg={cfg} />
       {seal.result ? (
-        <div className="stack" data-testid="sealed">
+        <div className="vstack gap-1 mt-3" data-testid="sealed">
           <Notice tone="ok">
             {t("comite.sealedRoot")} <Hex value={seal.result.index.root} head={10} tail={8} />
           </Notice>
-          <ul className="files">
+          <ul className="list-unstyled vstack gap-1 mb-3">
             {Object.entries(seal.result.files).map(([name, content]) => (
               <li key={name}>
-                <button type="button" className="link" onClick={() => downloadText(name, content, name.endsWith(".json") ? "application/json" : "text/plain")}>
+                <button type="button" className="btn btn-link p-0 align-baseline" onClick={() => downloadText(name, content, name.endsWith(".json") ? "application/json" : "text/plain")}>
                   {name}
                 </button>{" "}
-                <span className="muted">{t("common.bytes", { n: content.length })}</span>
+                <span className="text-muted">{t("common.bytes", { n: content.length })}</span>
               </li>
             ))}
           </ul>
-          <div className="row">
+          <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
             <Button variant="secondary" onClick={bundle}>
               {t("comite.downloadBundle")}
             </Button>
@@ -129,7 +129,7 @@ export function SealPanel({
               {t("comite.publish")}
             </Button>
           </div>
-          <p className="hint">{t("comite.publishHint", { uri: seal.result.uri })}</p>
+          <p className="form-text">{t("comite.publishHint", { uri: seal.result.uri })}</p>
         </div>
       ) : null}
       <ErrorBox error={pub.error} cfg={cfg} />

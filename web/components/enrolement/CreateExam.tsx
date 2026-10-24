@@ -62,6 +62,7 @@ export function CreateExam({ snap, b, onDone }: { snap: ExamSnapshot; b: BeaconS
     <Field label={label} htmlFor={`m-${k}`}>
       <input
         id={`m-${k}`}
+        className="form-control"
         type="number"
         min={1}
         step={1}
@@ -93,13 +94,13 @@ export function CreateExam({ snap, b, onDone }: { snap: ExamSnapshot; b: BeaconS
       ) : (
         <>
           {!snap.exam.frozen ? <Notice tone="warn">{t("enrol.freezeFirst")}</Notice> : null}
-          <div className="grid-4">
+          <div className="row row-cols-1 row-cols-sm-2 row-cols-lg-4">
             {minuteField("open", t("enrol.openIn"))}
             {minuteField("reveal", t("enrol.revealAfter"))}
             {minuteField("reserveOpen", t("enrol.reserveOpenAfter"))}
             {minuteField("reserveReveal", t("enrol.reserveRevealAfter"))}
           </div>
-          <p className="muted" data-testid="rounds-preview">
+          <p className="text-muted" data-testid="rounds-preview">
             {t("enrol.roundsPreview", {
               open: rounds.open,
               reveal: rounds.reveal,
@@ -109,10 +110,10 @@ export function CreateExam({ snap, b, onDone }: { snap: ExamSnapshot; b: BeaconS
             })}
           </p>
           <Field label={t("enrol.committees")} htmlFor="committees" hint={t("enrol.committeesHint")}>
-            <textarea id="committees" rows={4} value={committees} onChange={(e) => setCommittees(e.target.value)} />
+            <textarea id="committees" className="form-control" rows={4} value={committees} onChange={(e) => setCommittees(e.target.value)} />
           </Field>
           <Field label={t("enrol.reserveCommittee")} htmlFor="reserve">
-            <input id="reserve" value={reserve} onChange={(e) => setReserve(e.target.value)} />
+            <input id="reserve" className="form-control" value={reserve} onChange={(e) => setReserve(e.target.value)} />
           </Field>
           {!addrOk ? <Notice tone="warn">{t("enrol.badCommittees")}</Notice> : null}
         </>
