@@ -1,0 +1,13 @@
+{
+  "name": "SealHour",
+  "short_name": "SealHour",
+  "description": "Exam papers sealed under a double lock: drand timelock and the centre key.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#465dff",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/apple-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

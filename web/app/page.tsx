@@ -100,7 +100,7 @@ function ExamStatus() {
         <h2 className="header-title">{t("home.statusTitle")}</h2>
         <span className="badge badge-soft-primary px-2 py-1 fs-12">{t(`phase.${p.phase}` as DictKey)}</span>
       </div>
-      <div className="px-5 pt-2">
+      <div className="px-4 px-sm-5 pt-2">
         <div className="horizontal-steps mt-3 mb-3 pb-4" aria-hidden="true">
           <div className="horizontal-steps-content">
             {labels.map((l, i) => (

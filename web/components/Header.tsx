@@ -87,17 +87,17 @@ export function PhaseStepper() {
   const live = unknownLine ?? `${t("phase.now", { phase: t(`phase.${p.phase}` as DictKey) })} ${p.next ? t("phase.nextAt", { label: t(p.next.label), time: time(p.next.atMs) }) : ""}`;
 
   return (
-    <div className="phase-stepper d-flex align-items-center gap-2 position-relative" ref={pop.ref}>
-      <ol className="d-flex align-items-center list-unstyled mb-0 gap-2" aria-label={t("phase.aria")}>
+    <div className="phase-stepper d-flex align-items-center gap-2 position-relative min-w-0" ref={pop.ref}>
+      <ol className="d-flex align-items-center list-unstyled mb-0 gap-2 min-w-0" aria-label={t("phase.aria")}>
         {steps.map((s, i) => (
-          <li key={i} className={`phase-step phase-${s.state} ${s.state === "current" ? "d-flex" : "d-none d-xl-flex"}`} aria-current={s.state === "current" ? "step" : undefined}>
+          <li key={i} className={`phase-step min-w-0 phase-${s.state} ${s.state === "current" ? "d-flex" : "d-none d-xl-flex"}`} aria-current={s.state === "current" ? "step" : undefined}>
             {i > 0 ? <span className="phase-line d-none d-xl-block" aria-hidden="true" /> : null}
             <span className="phase-dot avatar-xs flex-shrink-0">
               <span className="avatar-title rounded-circle fs-12 fw-semibold">{s.state === "done" ? <i className="ti ti-check" aria-hidden="true" /> : i + 1}</span>
             </span>
-            <span className="d-flex flex-column lh-sm">
-              <span className="fw-medium text-nowrap">{s.label}</span>
-              <span className="fs-12 text-muted text-nowrap tabular">{s.state === "done" ? (
+            <span className="d-flex flex-column lh-sm min-w-0">
+              <span className="fw-medium text-truncate">{s.label}</span>
+              <span className="fs-12 text-muted text-truncate tabular">{s.state === "done" ? (
                   t("phase.done")
                 ) : s.state === "current" ? (
                   <>
@@ -112,15 +112,16 @@ export function PhaseStepper() {
         ))}
       </ol>
       {unknownLine ? (
-        <span className="badge badge-soft-warning px-2 py-1 text-nowrap" data-testid="phase-unknown">
-          <i className="ti ti-plug-connected-x me-1" aria-hidden="true" />
-          {unknownLine}
+        <span className="badge badge-soft-warning px-2 py-1 flex-shrink-0" title={unknownLine} data-testid="phase-unknown">
+          {/* Icon only on phones and next to the full stepper (xl) when narrow; the title and the live region carry the text. */}
+          <i className="ti ti-plug-connected-x me-sm-1 me-xl-0 me-xxl-1" aria-hidden="true" />
+          <span className="d-none d-sm-inline d-xl-none d-xxl-inline">{unknownLine}</span>
         </span>
       ) : null}
       <span className="visually-hidden" aria-live="polite">
         {live}
       </span>
-      <div className="topbar-item">
+      <div className="topbar-item flex-shrink-0">
       <button
           type="button"
           className="topbar-link"

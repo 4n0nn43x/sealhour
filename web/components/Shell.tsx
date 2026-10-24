@@ -10,7 +10,7 @@ import { useI18n } from "@/lib/i18n";
 import { storage } from "@/lib/storage";
 import { PhaseProvider, useOptionalPhase } from "@/lib/usePhase";
 import { ActingAs, DUE, KIND, PhaseStepper } from "./Header";
-import { Icon } from "./Icon";
+import { LogoMark } from "./Logo";
 import { Loading, Notice } from "./ui";
 
 // Layout attributes on <html>: defaults in app/layout.tsx (first paint script there too), kept up to date here.
@@ -18,11 +18,15 @@ export const THEME_KEY = "sealhour.theme";
 export const SIDENAV_KEY = "sealhour.sidenav";
 const CONFIG_SIZE = "sm-hover-active";
 
-/** Sidenav size for the window width, as the template's config: full on phones, condensed on tablets. */
+// Same breakpoints as the CSS (and the first paint script in app/layout.tsx). Media queries, not innerWidth:
+// a mobile browser zoomed out over an overflowing page reports a wider innerWidth than the CSS viewport.
+const PHONE = "(max-width: 767.98px)";
+const TABLET = "(max-width: 1140px)";
+
+/** Sidenav size for the viewport, as the template's config: full (drawer) on phones, condensed on tablets. */
 function fitSize(): string {
-  const w = window.innerWidth;
-  if (w <= 767.98) return "full";
-  if (w <= 1140) return "condensed";
+  if (window.matchMedia(PHONE).matches) return "full";
+  if (window.matchMedia(TABLET).matches) return "condensed";
   const saved = storage.get(SIDENAV_KEY);
   return saved === "sm-hover" || saved === "sm-hover-active" ? saved : CONFIG_SIZE;
 }
@@ -30,13 +34,31 @@ function fitSize(): string {
 function useLayout() {
   const [size, setSize] = useState<string>(() => (typeof window === "undefined" ? CONFIG_SIZE : fitSize()));
   const [open, setOpen] = useState(false);
+  const path = usePathname();
 
   useEffect(() => {
     const fit = () => setSize(fitSize());
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
+    const queries = [PHONE, TABLET].map((q) => window.matchMedia(q));
+    queries.forEach((m) => m.addEventListener("change", fit));
+    fit();
+    return () => queries.forEach((m) => m.removeEventListener("change", fit));
   }, []);
-  useEffect(() => document.documentElement.setAttribute("data-sidenav-size", size), [size]);
+  useEffect(() => {
+    document.documentElement.setAttribute("data-sidenav-size", size);
+    if (size !== "full") setOpen(false);
+  }, [size]);
+  // The drawer closes on navigation and on Escape (focus back on the menu button).
+  useEffect(() => setOpen(false), [path]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      document.querySelector<HTMLElement>(".sidenav-toggle-button")?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
   useEffect(() => {
     document.documentElement.classList.toggle("sidebar-enable", open);
     document.body.style.overflow = open ? "hidden" : "";
@@ -51,8 +73,9 @@ function useLayout() {
     close: () => setOpen(false),
     /** Topbar button: open the drawer on phones, otherwise switch between condensed and the configured size. */
     toggle: () => (size === "full" ? setOpen((o) => !o) : setSize((s) => (s === "condensed" ? storage.get(SIDENAV_KEY) ?? CONFIG_SIZE : "condensed"))),
-    /** Sidenav button on desktop: small sidebar that expands on hover, or the full one. */
+    /** Sidenav circle button: closes the drawer on phones; on desktop, small sidebar that expands on hover, or the full one. */
     pin: () => {
+      if (size === "full") return setOpen(false);
       const next = size === "sm-hover-active" ? "sm-hover" : "sm-hover-active";
       storage.set(SIDENAV_KEY, next);
       setSize(next);
@@ -75,12 +98,12 @@ function Topbar({ onToggle }: { onToggle: () => void }) {
     <header className="app-topbar">
       <div className="page-container topbar-menu gap-2">
         <div className="d-flex align-items-center gap-2 min-w-0">
-          <button type="button" className="sidenav-toggle-button px-2" onClick={onToggle} aria-label={t("nav.toggle")}>
+          <button type="button" className="sidenav-toggle-button px-2 flex-shrink-0" onClick={onToggle} aria-label={t("nav.toggle")}>
             <i className="ti ti-menu-deep fs-24" aria-hidden="true" />
           </button>
           {ok ? <PhaseStepper /> : null}
         </div>
-        <div className="d-flex align-items-center gap-2">
+        <div className="d-flex align-items-center gap-2 flex-shrink-0">
           {ok ? (
             <span className="badge badge-soft-warning text-uppercase fs-11 d-none d-sm-inline-block" title={t("demo.badgeTitle")} data-testid="demo-badge">
               {t("demo.badge")}
@@ -121,15 +144,11 @@ function Sidenav({ onPin, onClose }: { onPin: () => void; onClose: () => void })
     <div className="sidenav-menu">
       <Link href="/" className="logo">
         <span className="logo-lg">
-          <span className="logo-mark" aria-hidden="true">
-            <Icon name="lock-keyhole-bold-duotone" />
-          </span>
+          <LogoMark className="logo-mark" />
           SealHour
         </span>
         <span className="logo-sm">
-          <span className="logo-mark" aria-hidden="true">
-            <Icon name="lock-keyhole-bold-duotone" />
-          </span>
+          <LogoMark className="logo-mark" />
           <span className="visually-hidden">SealHour</span>
         </span>
       </Link>

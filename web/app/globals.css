@@ -29,7 +29,8 @@ textarea:focus-visible {
 .sidenav-menu .logo {
   color: var(--bs-menu-item-hover-color);
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -146,21 +147,20 @@ pre.code {
   min-width: 0;
 }
 .sidenav-menu .logo .logo-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  margin-right: 8px;
-  border-radius: 50%;
-  background: var(--bs-primary);
-  color: #fff;
-  font-size: 22px;
+  margin-right: 10px;
+  font-size: 34px;
   vertical-align: middle;
 }
 html[data-sidenav-size="condensed"] .sidenav-menu .logo .logo-mark,
 html[data-sidenav-size="sm-hover"] .sidenav-menu .logo .logo-mark {
   margin-right: 0;
+}
+
+/* Home status steps: the template's 2em gaps need 290px, wider than a 320px phone card. */
+@media (max-width: 575.98px) {
+  .horizontal-steps .horizontal-steps-content .step-item {
+    margin: 0 1em;
+  }
 }
 
 /* Topbar exam stepper: compact Osen steps (dot, label, countdown), connectors between them. */
