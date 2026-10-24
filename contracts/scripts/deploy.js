@@ -4,8 +4,9 @@
 // The beacon pin (chain hash, public key) is read from ../shared/beacon-info.json (required).
 //
 // Live mode: on Base Sepolia (chainId 84532), or anywhere with BEACON=quicknet, the beacon is drand quicknet:
-// genesis, period and pin are the pinned constants below, the public key is fetched from api.drand.sh and the
-// served info must match the pin. Output: ../shared/deployment.base-sepolia.json on chain 84532.
+// genesis, period and pin (chain hash and public key) are the constants below; the chain hash is recomputed from
+// them, and api.drand.sh, when reachable, must serve exactly the same info (BEACON_GENESIS, BEACON_PERIOD and
+// beacon-info.json are ignored). Output: ../shared/deployment.base-sepolia.json on chain 84532.
 // DEPLOYMENT_FILE overrides the output path (dry run: BEACON=quicknet DEPLOYMENT_FILE=/tmp/x.json --network hardhat).
 //   RPC_URL=... DEPLOYER_KEY=... npx hardhat run scripts/deploy.js --network baseSepolia
 //   npx hardhat verify --network baseSepolia <address> 1692803367 3 0x<chainHash> 0x<publicKey>   (Sourcify, no key)
@@ -35,25 +36,47 @@ function readBeaconPin() {
   return { chainHash, publicKey };
 }
 
+// drand quicknet, as served by https://api.drand.sh/<chainHash>/info (checked 2026-10-24).
 const QUICKNET = {
   chainHash: "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971",
+  publicKey:
+    "83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c8c4b450b6a0a6c3ac6a5776a2d1064510d1fec758c921cc22b0e17e63aaf4bcb5ed66304de9cf809bd274ca73bab4af5a6e9c76a4bc09e76eae8991ef5ece45a",
+  groupHash: "f477d5c89f21a17c863a7f937c6a6d15859414d2be09cd448d4279af331c5d3e",
   genesisTime: 1692803367,
   period: 3,
   scheme: "bls-unchained-g1-rfc9380",
+  beaconID: "quicknet",
 };
 
-/** quicknet pin: the public key comes from the relay, everything else must equal the constants above. */
+/** drand chain hash: sha256(period u32 BE, genesis i64 BE, public key, group hash, beacon id). */
+function drandChainHash(c) {
+  const head = Buffer.alloc(12);
+  head.writeUInt32BE(c.period, 0);
+  head.writeBigInt64BE(BigInt(c.genesisTime), 4);
+  const h = require("crypto").createHash("sha256").update(head).update(Buffer.from(c.publicKey, "hex"));
+  return h.update(Buffer.from(c.groupHash, "hex")).update(c.beaconID).digest("hex");
+}
+
+/** quicknet pin: the hardcoded constants only. The relay is a cross-check, never the source. */
 async function quicknetPin() {
+  if (drandChainHash(QUICKNET) !== QUICKNET.chainHash) throw new Error("quicknet constants do not hash to the quicknet chain hash");
   const url = `https://api.drand.sh/${QUICKNET.chainHash}/info`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-  const info = await res.json();
-  if (info.hash !== QUICKNET.chainHash || info.genesis_time !== QUICKNET.genesisTime || info.period !== QUICKNET.period || info.schemeID !== QUICKNET.scheme) {
-    throw new Error(`${url} does not serve drand quicknet: ${JSON.stringify(info)}`);
+  let info;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    info = await res.json();
+  } catch (e) {
+    console.warn(`${url} unreachable (${e.message}): deploying with the hardcoded quicknet pin`);
   }
-  const publicKey = String(info.public_key).toLowerCase();
-  if (!/^[0-9a-f]{192}$/.test(publicKey)) throw new Error(`quicknet public_key must be 96 bytes of hex, got ${info.public_key}`);
-  return { chainHash: QUICKNET.chainHash, publicKey };
+  if (
+    info &&
+    (info.hash !== QUICKNET.chainHash || String(info.public_key).toLowerCase() !== QUICKNET.publicKey ||
+      info.genesis_time !== QUICKNET.genesisTime || info.period !== QUICKNET.period || info.schemeID !== QUICKNET.scheme)
+  ) {
+    throw new Error(`${url} serves another chain than the pinned quicknet: ${JSON.stringify(info)}`);
+  }
+  return { chainHash: QUICKNET.chainHash, publicKey: QUICKNET.publicKey };
 }
 
 function toUint(name, value) {

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ethers } from "ethers";
+import { merkleRoot, packageLeaf } from "@sealhour/seal";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const APP_DIR = path.resolve(here, "..");
@@ -130,12 +131,29 @@ export function packageBundleBytes(files) {
   return data;
 }
 
-/** Read a set's package bytes back: eth_getLogs on exactly each recorded block, parts in order, then decode. */
+/**
+ * Read a set's package bytes back: eth_getLogs on exactly each recorded block, parts in order, then decode.
+ * Refuses unless the root is submitted (packageOf non zero, so the parts are final), every recorded part is
+ * there once, and index.json's leaves (recomputed from the centre files) hash to that root.
+ * The public copy (public.tlock) is outside the Merkle tree: check it by opening it after the reveal round.
+ */
 export async function readPackageBundle(registry, examId, setIndex) {
-  const blocks = [...new Set((await registry.packageDataBlocks(examId, setIndex)).map(Number))];
+  const [root] = await registry.packageOf(examId, setIndex);
+  if (root === ethers.ZeroHash) throw new Error(`set ${setIndex}: no package root on chain, the data parts are not final`);
+  const recorded = (await registry.packageDataBlocks(examId, setIndex)).map(Number);
   const logs = [];
-  for (const b of blocks) logs.push(...(await registry.queryFilter(registry.filters.PackageData(examId, setIndex), b, b)));
+  for (const b of new Set(recorded)) logs.push(...(await registry.queryFilter(registry.filters.PackageData(examId, setIndex), b, b)));
   const parts = logs.map((l) => l.args).sort((a, b) => Number(a.part) - Number(b.part));
-  if (parts.length === 0 || parts.some((p, i) => Number(p.part) !== i)) throw new Error(`set ${setIndex}: missing PackageData parts`);
-  return JSON.parse(ethers.toUtf8String(ethers.concat(parts.map((p) => p.data)))).files;
+  if (parts.length === 0 || parts.length !== recorded.length || parts.some((p, i) => Number(p.part) !== i)) {
+    throw new Error(`set ${setIndex}: ${parts.length} PackageData parts found, ${recorded.length} recorded`);
+  }
+  const files = JSON.parse(ethers.toUtf8String(ethers.concat(parts.map((p) => p.data)))).files;
+  const index = JSON.parse(files["index.json"]);
+  const leaves = index.items.map((it) => {
+    const leaf = packageLeaf(it.centreId, ethers.sha256(ethers.toUtf8Bytes(files[it.file] ?? "")));
+    if (leaf !== it.leaf) throw new Error(`set ${setIndex}: ${it.file} does not match its leaf`);
+    return leaf;
+  });
+  if (index.root !== root || merkleRoot(leaves) !== root) throw new Error(`set ${setIndex}: package leaves do not hash to the root on chain`);
+  return files;
 }

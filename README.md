@@ -9,7 +9,7 @@ A public registry on chain freezes the list of centres, records the sealed packa
 ```
 app/
   Makefile            install | test | demo | demo-cli | e2e | clean
-  contracts/          Hardhat 2, SealRegistry.sol (Solidity 0.8.26 via solc-js), 64 tests, scripts/deploy.js
+  contracts/          Hardhat 2, SealRegistry.sol (Solidity 0.8.26 via solc-js), 92 tests, scripts/deploy.js
   packages/seal/      TypeScript core (tlock-js 0.9.0 + age-encryption 0.3.1): seal/open, draw, fingerprint,
                       Merkle, base32, leak verifier. Node 22 and browser. 39 tests (vitest)
   scripts/            beacon-server.mjs (local drand compatible relay), seed-demo.mjs, demo-cli.mjs
@@ -48,7 +48,7 @@ All commands run from `app/`.
 | Command | What it does |
 |---|---|
 | `make install` | `npm ci` in contracts, packages/seal (then builds `dist/`), scripts, web (the web links the built seal module). |
-| `make test` | Contract tests (64), seal build + typecheck + tests (39), web typecheck + static build + browser smoke (pages without config, seal self test in the browser, pages with chain and relay down). |
+| `make test` | Contract tests (92), seal build + typecheck + tests (39), web typecheck + static build + browser smoke (pages without config, seal self test in the browser, pages with chain and relay down). |
 | `make demo` | Browser demo on a fresh local stack, runs until Ctrl+C (see below). |
 | `make demo-cli` | Same story without a browser: beacon period 1 s, opening in 20 s, 40 checks, prints `RESULT: OK (40/40 checks passed)`. |
 | `make e2e` | Same stack as `make demo`, short (period 1 s, opening in 75 s), then `web/scripts/e2e-live.mjs` drives the four screens in Chromium (33 checks, about 2 min 10 s). Fails if any check fails. Prints `E2E OK`. |
@@ -76,6 +76,18 @@ Press Ctrl+C to stop.
 
 Each page has a role selector (demo wallets from `demo-state.json`). Ctrl+C stops the node, the beacon and the web server. The seed cannot run twice on the same contract: every `make demo` starts a fresh chain.
 
+### Web front: icons and link previews
+
+The static export ships a favicon, app icons, a web manifest and a 1200x630 link preview image (`web/app/icon.svg`, `favicon.ico`, `apple-icon.png`, `manifest.json`, `opengraph-image.png`, `twitter-image.png`). They are committed; `node web/scripts/brand.mjs` regenerates them from the logo definition (Playwright Chromium).
+
+Link previews need absolute URLs, so set the public origin at build time when deploying:
+
+```
+cd web && NEXT_PUBLIC_SITE_URL=https://sealhour.example.org npm run build
+```
+
+`NEXT_PUBLIC_SITE_URL` (no trailing path) becomes the `metadataBase` of `web/app/layout.tsx`: `og:image`, `twitter:image` and `og:url` start with it. Unset, it defaults to `http://localhost:3000` (the port of `npm run serve`), which is fine locally but gives previews nobody else can load.
+
 ### Final demo walkthrough (4:30 script, docs/smu/32 section 9)
 
 | Time | Script | Where |
@@ -100,11 +112,21 @@ The cloud sandbox blocks `api.drand.sh`, `sepolia.base.org` and the solc binary 
 
 ### Switching to drand quicknet and Base Sepolia (not verified here: network blocked)
 
-1. Beacon: do not start `beacon-server.mjs`. Save the real chain info: `curl -s $BEACON_URL/info > shared/beacon-info.json` with `BEACON_URL=https://api.drand.sh/52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971` (quicknet: genesis 1692803367, period 3 s, as in tlock-js defaults).
-2. Chain (`deploy.js` pins the hash and public key of `shared/beacon-info.json` in the contract): put `RPC_URL` and `DEPLOYER_KEY` (throwaway testnet key) in `.env` (see `.env.example`), export them, then `cd contracts && BEACON_GENESIS=1692803367 BEACON_PERIOD=3 npx hardhat run scripts/deploy.js --network baseSepolia`.
+1. Beacon: do not start `beacon-server.mjs`. `BEACON_URL=https://api.drand.sh/52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971` (quicknet: genesis 1692803367, period 3 s, as in tlock-js defaults).
+2. Chain: put `RPC_URL` and `DEPLOYER_KEY` (throwaway testnet key) in `.env` (see `.env.example`), export them, then `cd contracts && npx hardhat run scripts/deploy.js --network baseSepolia`. On chain 84532 (or with `BEACON=quicknet`) `deploy.js` ignores `BEACON_GENESIS`, `BEACON_PERIOD` and `shared/beacon-info.json`: it pins the quicknet constants hardcoded in the script (chain hash, public key, genesis, period), checks that they hash to the quicknet chain hash, and refuses to deploy if api.drand.sh, when reachable, serves anything else. Output: `shared/deployment.base-sepolia.json`.
 3. Seed with `node scripts/seed-demo.mjs --beacon $BEACON_URL --rpc $RPC_URL`, and write `web/public/config.json` as `make demo` does. Limitation: `seed-demo.mjs` funds its demo wallets and signs as the office through the node's unlocked account 0, so on Base Sepolia it needs a signer change first; the web reads the beacon URL from `demo-state.json` (`beaconUrl`).
 
 For the local stack the Makefile ignores `BEACON_URL`, `RPC_URL` and `DEPLOYER_KEY`.
+
+### Live centre enrolment and freeze
+
+On the live path each centre sets its own key, so the office must freeze exactly the keys it reviewed:
+
+1. Office: `registerCentreOperator(centreId, operator, name)` for each centre (non zero `centreId`).
+2. Each operator: `setCentreKey(centreId, key)` (its age X25519 recipient as bytes32). Zero reverts `BadList`, a low order X25519 point reverts `BadKey`.
+3. Office: reads the keys (`getCentre`), checks them with the centres out of band, then `freezeCentresWithKeys(examId, centreIds, keys, listRoot, count)`. It reverts `KeyMismatch` if any current key differs from `keys[i]` (an operator rotated its key after the review): review again and retry. `listRoot` is still `keccak256(abi.encodePacked(centreIds))`, ids only; the frozen keys are read with `getCentre`.
+
+`freezeCentres` (no keys) still works for keys set by the office with `registerCentre` (the local demo), and reverts `KeyMismatch` when a listed centre's key was set by its operator. `centreOfOperator` is a hint only: resolve roles from `examSnapshot` (or `allCentres` + `getCentre`).
 
 ## Security notes
 

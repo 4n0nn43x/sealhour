@@ -937,7 +937,7 @@ describe("SealRegistry", function () {
       expect((await registry.getCentre(CENTRE_IDS[0])).pubKey).to.equal(KEYS[0]);
     });
 
-    it("freezeCentres reverts NoKey on a centre without a key, then accepts it once the key is set", async function () {
+    it("freezeCentres reverts NoKey on a centre without a key; once the operator sets it, only the keyed freeze accepts it", async function () {
       const { registry, operators } = await load(registeredFixture);
       await registry.registerCentreOperator(NEW, operators[0].address, "New");
       const ids = [CENTRE_IDS[1], NEW];
@@ -946,7 +946,8 @@ describe("SealRegistry", function () {
       expect((await registry.getCentre(CENTRE_IDS[1])).frozen).to.equal(false);
       expect(await registry.examIds()).to.deep.equal([]);
       await registry.connect(operators[0]).setCentreKey(NEW, id("k"));
-      await expect(registry.freezeCentres(EXAM, ids, listRoot(ids), 2)).to.emit(registry, "CentresFrozen");
+      await expect(registry.freezeCentres(EXAM, ids, listRoot(ids), 2)).to.be.revertedWithCustomError(registry, "KeyMismatch");
+      await expect(registry.freezeCentresWithKeys(EXAM, ids, [KEYS[1], id("k")], listRoot(ids), 2)).to.emit(registry, "CentresFrozen");
       expect((await registry.getCentre(NEW)).frozen).to.equal(true);
     });
   });
@@ -1186,6 +1187,120 @@ describe("SealRegistry", function () {
       const gas = await registry.examSnapshot.estimateGas(EXAM);
       console.log(`      examSnapshot (4 centres, 5 sets): estimateGas ${gas}`);
       expect(gas).to.be.below(1_000_000n);
+    });
+  });
+
+  // ---------------------------------------------------------------- audit fixes
+
+  describe("audit fixes", function () {
+    const NEW = id("centre:new");
+    const ff = "ff".repeat(30);
+    // Low order X25519 points as little endian bytes (age cannot encrypt to them), see _checkKey.
+    const LOW = [
+      "0x" + "01" + "00".repeat(31),
+      "0x" + "ec" + ff + "7f",
+      "0x" + "ed" + ff + "7f",
+      "0x" + "ee" + ff + "7f",
+      "0x5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157",
+      "0xe0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
+    ];
+    const topBit = (k) => ethers.toBeHex(BigInt(k) | 0x80n, 32);
+    const BAD_KEYS = [...LOW, ...LOW.map(topBit), topBit(ethers.ZeroHash)];
+
+    it("H1: an operator key swap landing before freezeCentresWithKeys reverts KeyMismatch, nothing frozen", async function () {
+      const { registry, operators } = await load(deployFixture);
+      const ids = CENTRE_IDS.slice(0, 2);
+      for (let i = 0; i < 2; i++) await registry.registerCentreOperator(ids[i], operators[i].address, CENTRES[i]);
+      for (let i = 0; i < 2; i++) await registry.connect(operators[i]).setCentreKey(ids[i], KEYS[i]);
+      // The office reviewed KEYS[0..1]; operator 0 front-runs with another key.
+      await registry.connect(operators[0]).setCentreKey(ids[0], id("attacker"));
+      await expect(
+        registry.freezeCentresWithKeys(EXAM, ids, KEYS.slice(0, 2), listRoot(ids), 2)
+      ).to.be.revertedWithCustomError(registry, "KeyMismatch");
+      await expect(registry.freezeCentres(EXAM, ids, listRoot(ids), 2)).to.be.revertedWithCustomError(registry, "KeyMismatch");
+      expect((await registry.getExam(EXAM)).frozen).to.equal(false);
+      expect((await registry.getCentre(ids[1])).frozen).to.equal(false);
+      // A low order key cannot be planted at all.
+      await expect(registry.connect(operators[0]).setCentreKey(ids[0], LOW[0])).to.be.revertedWithCustomError(registry, "BadKey");
+    });
+
+    it("operator-set keys: freezeCentresWithKeys freezes them, keeps listRoot over ids only, then KeyFrozen", async function () {
+      const { registry, operators } = await load(deployFixture);
+      for (let i = 0; i < 4; i++) await registry.registerCentreOperator(CENTRE_IDS[i], operators[i].address, CENTRES[i]);
+      for (let i = 0; i < 4; i++) await registry.connect(operators[i]).setCentreKey(CENTRE_IDS[i], KEYS[i]);
+      const root = listRoot(CENTRE_IDS);
+      const tx = await registry.freezeCentresWithKeys(EXAM, CENTRE_IDS, KEYS, root, 4);
+      await expect(tx).to.emit(registry, "CentresFrozen").withArgs(EXAM, root, 4);
+      console.log(`      freezeCentresWithKeys (4 centres): gasUsed ${(await tx.wait()).gasUsed}`);
+      expect((await registry.getExam(EXAM)).listRoot).to.equal(root);
+      for (let i = 0; i < 4; i++) {
+        const c = await registry.getCentre(CENTRE_IDS[i]);
+        expect([c.pubKey, c.frozen]).to.deep.equal([KEYS[i], true]);
+      }
+      await expect(registry.connect(operators[0]).setCentreKey(CENTRE_IDS[0], id("k"))).to.be.revertedWithCustomError(registry, "KeyFrozen");
+    });
+
+    it("freezeCentresWithKeys accepts office-set keys, reverts NotOffice, BadList on a key count mismatch, KeyMismatch on a wrong key", async function () {
+      const { registry, stranger } = await load(registeredFixture);
+      const root = listRoot(CENTRE_IDS);
+      await expect(
+        registry.connect(stranger).freezeCentresWithKeys(EXAM, CENTRE_IDS, KEYS, root, 4)
+      ).to.be.revertedWithCustomError(registry, "NotOffice");
+      await expect(registry.freezeCentresWithKeys(EXAM, CENTRE_IDS, KEYS.slice(0, 3), root, 4)).to.be.revertedWithCustomError(registry, "BadList");
+      await expect(registry.freezeCentresWithKeys(EXAM, [], [], listRoot([]), 0)).to.be.revertedWithCustomError(registry, "BadList");
+      const wrong = [...KEYS.slice(0, 3), id("other")];
+      await expect(registry.freezeCentresWithKeys(EXAM, CENTRE_IDS, wrong, root, 4)).to.be.revertedWithCustomError(registry, "KeyMismatch");
+      await expect(registry.freezeCentresWithKeys(EXAM, CENTRE_IDS, KEYS, root, 4)).to.emit(registry, "CentresFrozen");
+      await expect(registry.freezeCentresWithKeys(EXAM, CENTRE_IDS, KEYS, root, 4)).to.be.revertedWithCustomError(registry, "AlreadyDone");
+    });
+
+    it("an office re-registration clears the operator-set flag: freezeCentres accepts the centre again", async function () {
+      const { registry, operators } = await load(registeredFixture);
+      await registry.connect(operators[0]).setCentreKey(CENTRE_IDS[0], id("k"));
+      await expect(registry.freezeCentres(EXAM, CENTRE_IDS, listRoot(CENTRE_IDS), 4)).to.be.revertedWithCustomError(registry, "KeyMismatch");
+      await registry.registerCentre(CENTRE_IDS[0], KEYS[0], operators[0].address, CENTRES[0]);
+      await expect(registry.freezeCentres(EXAM, CENTRE_IDS, listRoot(CENTRE_IDS), 4)).to.emit(registry, "CentresFrozen");
+    });
+
+    it("BadKey for every low order X25519 point (top bit masked) in registerCentre and setCentreKey", async function () {
+      const { registry, operators } = await load(deployFixture);
+      await registry.registerCentreOperator(NEW, operators[0].address, "New");
+      expect(BAD_KEYS.length).to.equal(13);
+      for (const k of BAD_KEYS) {
+        await expect(registry.registerCentre(NEW, k, operators[0].address, "New"), k).to.be.revertedWithCustomError(registry, "BadKey");
+        await expect(registry.connect(operators[0]).setCentreKey(NEW, k), k).to.be.revertedWithCustomError(registry, "BadKey");
+      }
+      // Neighbours of those values are ordinary keys.
+      await registry.registerCentre(NEW, "0x02" + "00".repeat(31), operators[0].address, "New");
+      await registry.connect(operators[0]).setCentreKey(NEW, "0xef" + ff + "7f");
+    });
+
+    it("L1: a zero centre id reverts BadList in registerCentre and registerCentreOperator", async function () {
+      const { registry, operators } = await load(deployFixture);
+      await expect(registry.registerCentre(ethers.ZeroHash, KEYS[0], operators[0].address, "x")).to.be.revertedWithCustomError(registry, "BadList");
+      await expect(registry.registerCentreOperator(ethers.ZeroHash, operators[0].address, "x")).to.be.revertedWithCustomError(registry, "BadList");
+      expect(await registry.allCentres()).to.deep.equal([]);
+    });
+
+    it("L2: joinExam reverts BadList on an empty or > 1024 byte tlockedRc, accepts exactly 1024", async function () {
+      const f = await load(createdFixture);
+      const c = f.registry.connect(f.operators[0]);
+      await expect(c.joinExam(EXAM, CENTRE_IDS[0], id("rc"), "0x")).to.be.revertedWithCustomError(f.registry, "BadList");
+      await expect(c.joinExam(EXAM, CENTRE_IDS[0], id("rc"), new Uint8Array(1025).fill(0x61))).to.be.revertedWithCustomError(f.registry, "BadList");
+      await expect(c.joinExam(EXAM, CENTRE_IDS[0], id("rc"), new Uint8Array(1024).fill(0x61))).to.emit(f.registry, "CentreJoined");
+    });
+
+    it("burned set: postPackageData and submitPackage revert Burned, other sets still accepted", async function () {
+      const f = await load(createdFixture);
+      const c = f.registry.connect(f.committees[1]);
+      await c.postPackageData(EXAM, 1, "0x01");
+      await c.burnSet(EXAM, 1);
+      await expect(c.postPackageData(EXAM, 1, "0x02")).to.be.revertedWithCustomError(f.registry, "Burned");
+      await expect(c.submitPackage(EXAM, 1, id("root"), "chain:")).to.be.revertedWithCustomError(f.registry, "Burned");
+      // Other callers still get NotCommittee first.
+      await expect(f.registry.connect(f.stranger).submitPackage(EXAM, 1, id("root"), "x")).to.be.revertedWithCustomError(f.registry, "NotCommittee");
+      await expect(f.registry.connect(f.committees[0]).submitPackage(EXAM, 0, id("root"), "chain:")).to.emit(f.registry, "PackageSubmitted");
+      expect((await f.registry.packageOf(EXAM, 1)).root).to.equal(ethers.ZeroHash);
     });
   });
 

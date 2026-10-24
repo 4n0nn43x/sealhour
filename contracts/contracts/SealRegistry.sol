@@ -21,6 +21,13 @@ contract SealRegistry {
     error AlreadyDone();
     error LastSet();
     error NoKey();
+    /// @notice A listed centre's current key differs from the one the office reviewed, or (freezeCentres)
+    ///         was set by its operator and so was never passed to the office.
+    error KeyMismatch();
+    /// @notice Degenerate X25519 key (low order point, top bit ignored): age cannot encrypt to it.
+    error BadKey();
+    /// @notice The set was burned: no more package data or root for it.
+    error Burned();
 
     // ------------------------------------------------------------------ events
 
@@ -85,6 +92,8 @@ contract SealRegistry {
         address operator;
         bool registered;
         bool frozen;
+        /// @dev Current key set by the operator (setCentreKey), cleared when the office sets or clears it.
+        bool operatorKey;
         string name;
     }
 
@@ -124,6 +133,8 @@ contract SealRegistry {
     /// @dev postPackageData: at most MAX_DATA bytes per call (tx pools cap a tx at 128 KiB), MAX_PARTS calls per set.
     uint256 private constant MAX_DATA = 64 * 1024;
     uint256 private constant MAX_PARTS = 64;
+    /// @dev joinExam: cap on tlockedRc (armored tlock of a 32 byte r_c, 588 to 605 bytes measured).
+    uint256 private constant MAX_TLOCKED_RC = 1024;
 
     /// @notice Exam office: the only account allowed to register centres, freeze lists, create exams.
     address public immutable office;
@@ -148,6 +159,8 @@ contract SealRegistry {
     bytes32[] private _centreIds;
     /// @notice Centre run by an operator address, zero if none. If one address operates several centres,
     ///         the most recent registration wins.
+    /// @dev A hint only: it can go stale (one address, several centres; an operator replaced). Clients must
+    ///      resolve roles from examSnapshot (or allCentres + getCentre) and use this map only as a shortcut.
     mapping(address => bytes32) public centreOfOperator;
 
     modifier onlyOffice() {
@@ -178,24 +191,24 @@ contract SealRegistry {
     // ------------------------------------------------------------------ office
 
     /// @notice Register or update a centre. Reverts once the centre appears in a frozen list.
-    /// @dev Reverts BadList on a zero key or a zero operator.
+    /// @dev Reverts BadList on a zero centre id, a zero key or a zero operator, BadKey on a low order key.
     function registerCentre(bytes32 centreId, bytes32 x25519PubKey, address operator, string calldata name)
         external
         onlyOffice
     {
-        if (x25519PubKey == bytes32(0)) revert BadList();
+        _checkKey(x25519PubKey);
         _register(centreId, x25519PubKey, operator, name);
     }
 
     /// @notice Register or update a centre without its key: the operator then calls setCentreKey.
     ///         Any previous key is cleared. Reverts once the centre appears in a frozen list.
-    /// @dev Reverts BadList on a zero operator. Emits CentreRegistered with a zero key.
+    /// @dev Reverts BadList on a zero centre id or a zero operator. Emits CentreRegistered with a zero key.
     function registerCentreOperator(bytes32 centreId, address operator, string calldata name) external onlyOffice {
         _register(centreId, bytes32(0), operator, name);
     }
 
     function _register(bytes32 centreId, bytes32 x25519PubKey, address operator, string calldata name) private {
-        if (operator == address(0)) revert BadList();
+        if (centreId == bytes32(0) || operator == address(0)) revert BadList();
         Centre storage c = _centres[centreId];
         if (c.frozen) revert KeyFrozen();
         if (!c.registered) _centreIds.push(centreId);
@@ -203,6 +216,7 @@ contract SealRegistry {
         if (centreOfOperator[c.operator] == centreId) delete centreOfOperator[c.operator];
         centreOfOperator[operator] = centreId;
         c.pubKey = x25519PubKey;
+        c.operatorKey = false;
         c.operator = operator;
         c.name = name;
         c.registered = true;
@@ -212,23 +226,54 @@ contract SealRegistry {
     // ------------------------------------------------------------------ centre operators
 
     /// @notice The centre's operator sets or rotates its X25519 key, until an exam freezes a list containing it.
-    /// @dev Reverts NotCentre for any other caller, KeyFrozen once frozen, BadList on a zero key.
+    /// @dev Reverts NotCentre for any other caller, KeyFrozen once frozen, BadList on a zero key, BadKey on a
+    ///      low order key. An operator-set key can only be frozen by freezeCentresWithKeys.
     function setCentreKey(bytes32 centreId, bytes32 x25519PubKey) external {
         Centre storage c = _centres[centreId];
         if (!c.registered || msg.sender != c.operator) revert NotCentre();
         if (c.frozen) revert KeyFrozen();
-        if (x25519PubKey == bytes32(0)) revert BadList();
+        _checkKey(x25519PubKey);
         c.pubKey = x25519PubKey;
+        c.operatorKey = true;
         emit CentreKeySet(centreId, x25519PubKey, msg.sender);
     }
 
     /// @notice Freeze the list of centres of an exam, once. Freezes the key of every listed centre.
     /// @dev listRoot must equal keccak256(abi.encodePacked(centreIds)) and count its length.
-    ///      Reverts NoKey when a listed centre has no key yet (registered by registerCentreOperator).
+    ///      Reverts NoKey when a listed centre has no key yet (registered by registerCentreOperator),
+    ///      KeyMismatch when a listed centre's key was set by its operator: use freezeCentresWithKeys.
     function freezeCentres(bytes32 examId, bytes32[] calldata centreIds, bytes32 listRoot, uint32 count)
         external
         onlyOffice
     {
+        _freeze(examId, centreIds, centreIds[:0], listRoot, count);
+    }
+
+    /// @notice Same as freezeCentres, and every listed centre's current key must equal keys[i], the key the
+    ///         office reviewed: an operator rotating its key before the freeze lands makes it revert, not
+    ///         freeze an unreviewed key. Accepts office-set and operator-set keys.
+    /// @dev listRoot still covers the ids only (keccak256(abi.encodePacked(centreIds))); the frozen keys are
+    ///      read with getCentre. Reverts BadList when keys.length differs from centreIds.length, KeyMismatch on
+    ///      any differing key, then as freezeCentres.
+    function freezeCentresWithKeys(
+        bytes32 examId,
+        bytes32[] calldata centreIds,
+        bytes32[] calldata keys,
+        bytes32 listRoot,
+        uint32 count
+    ) external onlyOffice {
+        if (keys.length != centreIds.length || keys.length == 0) revert BadList();
+        _freeze(examId, centreIds, keys, listRoot, count);
+    }
+
+    /// @dev keys empty: freezeCentres (operator-set keys refused), otherwise one expected key per centre.
+    function _freeze(
+        bytes32 examId,
+        bytes32[] calldata centreIds,
+        bytes32[] calldata keys,
+        bytes32 listRoot,
+        uint32 count
+    ) private {
         Exam storage e = _exams[examId];
         if (e.frozen) revert AlreadyDone();
         uint256 n = centreIds.length;
@@ -241,6 +286,7 @@ contract SealRegistry {
             Centre storage c = _centres[id];
             if (!c.registered) revert BadList();
             if (c.pubKey == bytes32(0)) revert NoKey();
+            if (keys.length == 0 ? c.operatorKey : c.pubKey != keys[i]) revert KeyMismatch();
             if (listed[id]) revert BadList(); // duplicate
             listed[id] = true;
             c.frozen = true;
@@ -251,6 +297,21 @@ contract SealRegistry {
         e.frozen = true;
         _examIds.push(examId);
         emit CentresFrozen(examId, listRoot, count);
+    }
+
+    /// @dev Zero key: BadList. Low order X25519 points (u = 0, 1, p - 1, p, p + 1 and the two order 8 points,
+    ///      as little endian bytes, top bit masked as X25519 does): BadKey.
+    function _checkKey(bytes32 k) private pure {
+        if (k == bytes32(0)) revert BadList();
+        k &= ~bytes32(uint256(0x80));
+        if (
+            k == bytes32(0) || k == bytes32(uint256(1) << 248)
+                || k == 0xecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+                || k == 0xedffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+                || k == 0xeeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+                || k == 0x5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157
+                || k == 0xe0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800
+        ) revert BadKey();
     }
 
     /// @notice Create an exam on a frozen list, with one committee per set and a reserve committee.
@@ -299,7 +360,7 @@ contract SealRegistry {
     /// @notice Publish the Merkle root and URI of a sealed package, once per set.
     /// @dev setIndex < setCount: that set's committee, before openRound.
     ///      setIndex == setCount: the reserve committee, before reserveOpenRound.
-    ///      A zero packageRoot reverts BadList (zero means "not submitted" in packageOf).
+    ///      Reverts Burned on a burned set. A zero packageRoot reverts BadList (zero means "not submitted" in packageOf).
     function submitPackage(bytes32 examId, uint8 setIndex, bytes32 packageRoot, string calldata uri) external {
         if (packageRoot == bytes32(0)) revert BadList();
         _onlyCommitteeInTime(examId, setIndex);
@@ -328,6 +389,7 @@ contract SealRegistry {
 
     /// @dev setIndex < setCount: that set's committee, before openRound.
     ///      setIndex == setCount: the reserve committee, before reserveOpenRound.
+    ///      Reverts Burned on a burned set.
     function _onlyCommitteeInTime(bytes32 examId, uint8 setIndex) private view {
         Exam storage e = _exams[examId];
         uint256 setCount = e.committees.length;
@@ -342,6 +404,7 @@ contract SealRegistry {
             revert NotCommittee();
         }
         if (currentRound() >= deadline) revert TooLate();
+        if (_burned[examId][setIndex]) revert Burned();
     }
 
     /// @notice Burn a set seen before its opening, so the draw skips it.
@@ -363,6 +426,7 @@ contract SealRegistry {
 
     /// @notice A listed centre publishes H(r_c) and tlock(revealRound, r_c), once, before openRound.
     /// @dev An rcCommit already used by another centre of the same exam reverts AlreadyDone.
+    ///      tlockedRc must hold 1 to MAX_TLOCKED_RC bytes (BadList); tlock of a 32 byte r_c is 588 to 605 bytes measured.
     function joinExam(bytes32 examId, bytes32 centreId, bytes32 rcCommit, bytes calldata tlockedRc) external {
         Exam storage e = _exams[examId];
         if (!e.created) revert TooEarly();
@@ -372,6 +436,7 @@ contract SealRegistry {
         Participation storage p = _participation[examId][centreId];
         if (p.joined) revert AlreadyDone();
         if (_rcUsed[examId][rcCommit]) revert AlreadyDone();
+        if (tlockedRc.length == 0 || tlockedRc.length > MAX_TLOCKED_RC) revert BadList();
         _rcUsed[examId][rcCommit] = true;
         p.rcCommit = rcCommit;
         p.tlockedRc = tlockedRc;
