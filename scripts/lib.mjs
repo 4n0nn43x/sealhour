@@ -121,3 +121,21 @@ export async function readBeaconPin(registry, deployment) {
 export function centreIdOf(name) {
   return ethers.keccak256(ethers.toUtf8Bytes(name));
 }
+
+/** On chain package encoding: UTF-8 bytes of JSON {"files": {name: text}} (same names and contents as the files). */
+export function packageBundleBytes(files) {
+  const data = ethers.toUtf8Bytes(JSON.stringify({ files }));
+  // ponytail: one PackageData part per set; split in MAX_DATA chunks (parts 0, 1, ...) if a set outgrows 64 KiB.
+  if (data.length > 64 * 1024) throw new Error(`package bundle is ${data.length} B, above the 64 KiB part limit`);
+  return data;
+}
+
+/** Read a set's package bytes back: eth_getLogs on exactly each recorded block, parts in order, then decode. */
+export async function readPackageBundle(registry, examId, setIndex) {
+  const blocks = [...new Set((await registry.packageDataBlocks(examId, setIndex)).map(Number))];
+  const logs = [];
+  for (const b of blocks) logs.push(...(await registry.queryFilter(registry.filters.PackageData(examId, setIndex), b, b)));
+  const parts = logs.map((l) => l.args).sort((a, b) => Number(a.part) - Number(b.part));
+  if (parts.length === 0 || parts.some((p, i) => Number(p.part) !== i)) throw new Error(`set ${setIndex}: missing PackageData parts`);
+  return JSON.parse(ethers.toUtf8String(ethers.concat(parts.map((p) => p.data)))).files;
+}

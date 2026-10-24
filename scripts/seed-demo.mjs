@@ -23,6 +23,8 @@ import {
   tlockText,
 } from "@sealhour/seal";
 import {
+  packageBundleBytes,
+  readPackageBundle,
   DEFAULT_BEACON_URL,
   DEFAULT_RPC_URL,
   FILES,
@@ -129,6 +131,7 @@ async function main() {
   log(`exam created: opening at round ${rounds.open}, reveal ${rounds.reveal}, reserve ${rounds.reserveOpen} and ${rounds.reserveReveal}`);
 
   // 4. Committees: write the drafts, seal one copy per centre, publish the public copy, submit the root.
+  //    The same files also go on chain (postPackageData, live mode encoding); the demo keeps reading the files.
   fs.rmSync(FILES.setsDir, { recursive: true, force: true });
   fs.rmSync(FILES.packagesDir, { recursive: true, force: true });
   const sealers = [...committees, reserve];
@@ -144,17 +147,24 @@ async function main() {
     const dir = path.join(FILES.packagesDir, examId, `set-${k.setIndex}`);
     fs.mkdirSync(dir, { recursive: true });
     const items = [];
+    const files = {};
     for (const it of sealed.items) {
       const file = `${it.centreId}.tlock`;
       fs.writeFileSync(path.join(dir, file), it.ciphertext);
+      files[file] = it.ciphertext;
       items.push({ centreId: it.centreId, file, leaf: it.leaf });
     }
-    fs.writeFileSync(path.join(dir, "public.tlock"), await tlockText(serializeExamSet(set), revealRound, client));
-    writeJson(path.join(dir, "index.json"), { setIndex: k.setIndex, label: k.label, round, root: sealed.root, items, publicCopy: "public.tlock" });
+    files["public.tlock"] = await tlockText(serializeExamSet(set), revealRound, client);
+    fs.writeFileSync(path.join(dir, "public.tlock"), files["public.tlock"]);
+    const index = { setIndex: k.setIndex, label: k.label, round, root: sealed.root, items, publicCopy: "public.tlock" };
+    writeJson(path.join(dir, "index.json"), index);
+    files["index.json"] = JSON.stringify(index, null, 2) + "\n";
     const uri = `packages/${examId}/set-${k.setIndex}/index.json`;
-    packages.push({ setIndex: k.setIndex, root: sealed.root, uri });
+    packages.push({ setIndex: k.setIndex, root: sealed.root, uri, files });
     const asCommittee = registry.connect(k.wallet.connect(provider));
-    submissions.push(await asCommittee.submitPackage(examId, k.setIndex, sealed.root, uri));
+    // Fresh wallet: explicit nonces keep the data part before the root without waiting for a block.
+    submissions.push(await asCommittee.postPackageData(examId, k.setIndex, packageBundleBytes(files), { nonce: 0 }));
+    submissions.push(await asCommittee.submitPackage(examId, k.setIndex, sealed.root, uri, { nonce: 1 }));
   }
 
   // 5. Centres: commit to r_c and tlock it to the reveal round.
@@ -166,6 +176,14 @@ async function main() {
   }
   await Promise.all([...submissions, ...joins].map((tx) => tx.wait()));
   log(`${packages.length} packages sealed and published (sets ${SET_LABELS.join(", ")}), ${joins.length} centres joined the exam`);
+  let onChainBytes = 0;
+  for (const p of packages) {
+    const files = await readPackageBundle(registry, examId, p.setIndex);
+    if (JSON.stringify(files) !== JSON.stringify(p.files)) throw new Error(`package ${p.setIndex}: bytes on chain differ from the files`);
+    onChainBytes += packageBundleBytes(files).length;
+    delete p.files;
+  }
+  log(`package bytes also on chain (PackageData events, ${onChainBytes} B), read back with eth_getLogs on the recorded blocks`);
 
   // 6. Check what the chain now holds.
   for (const p of packages) {

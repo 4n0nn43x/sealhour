@@ -44,4 +44,8 @@ module.exports = {
     settings: { optimizer: { enabled: true, runs: 200 } },
   },
   networks,
+  // `npx hardhat verify --network baseSepolia ...` submits to Sourcify (no key, Blockscout reads it);
+  // Etherscan (API V2) only when ETHERSCAN_API_KEY is set.
+  etherscan: { apiKey: process.env.ETHERSCAN_API_KEY || "", enabled: Boolean(process.env.ETHERSCAN_API_KEY) },
+  sourcify: { enabled: true },
 };

@@ -864,6 +864,331 @@ describe("SealRegistry", function () {
     });
   });
 
+  // ---------------------------------------------------------------- live testnet: keys set by the centre
+
+  describe("registerCentreOperator and setCentreKey", function () {
+    const NEW = id("centre:new");
+
+    it("registers a centre without a key, emits CentreRegistered with a zero key", async function () {
+      const { registry, operators } = await load(deployFixture);
+      await expect(registry.registerCentreOperator(NEW, operators[0].address, "New"))
+        .to.emit(registry, "CentreRegistered")
+        .withArgs(NEW, ethers.ZeroHash, operators[0].address, "New");
+      const c = await registry.getCentre(NEW);
+      expect(c.pubKey).to.equal(ethers.ZeroHash);
+      expect(c.operator).to.equal(operators[0].address);
+      expect(c.name).to.equal("New");
+    });
+
+    it("clears a previous key, reverts NotOffice, BadList on a zero operator, KeyFrozen once frozen", async function () {
+      const { registry, operators, stranger } = await load(frozenFixture);
+      await registry.registerCentre(NEW, id("k"), operators[0].address, "New");
+      await registry.registerCentreOperator(NEW, operators[0].address, "New");
+      expect((await registry.getCentre(NEW)).pubKey).to.equal(ethers.ZeroHash);
+      await expect(
+        registry.connect(stranger).registerCentreOperator(NEW, stranger.address, "x")
+      ).to.be.revertedWithCustomError(registry, "NotOffice");
+      await expect(registry.registerCentreOperator(NEW, ethers.ZeroAddress, "x")).to.be.revertedWithCustomError(
+        registry,
+        "BadList"
+      );
+      await expect(
+        registry.registerCentreOperator(CENTRE_IDS[0], operators[0].address, "x")
+      ).to.be.revertedWithCustomError(registry, "KeyFrozen");
+    });
+
+    it("lets the operator set and rotate its key, emits CentreKeySet", async function () {
+      const { registry, operators } = await load(deployFixture);
+      await registry.registerCentreOperator(NEW, operators[0].address, "New");
+      await expect(registry.connect(operators[0]).setCentreKey(NEW, id("k1")))
+        .to.emit(registry, "CentreKeySet")
+        .withArgs(NEW, id("k1"), operators[0].address);
+      await registry.connect(operators[0]).setCentreKey(NEW, id("k2"));
+      const c = await registry.getCentre(NEW);
+      expect(c.pubKey).to.equal(id("k2"));
+      expect(c.operator).to.equal(operators[0].address);
+      expect(c.name).to.equal("New");
+    });
+
+    it("reverts NotCentre for the office, a stranger, another operator or an unregistered centre", async function () {
+      const { registry, office, stranger, operators } = await load(registeredFixture);
+      for (const s of [office, stranger, operators[1]]) {
+        await expect(registry.connect(s).setCentreKey(CENTRE_IDS[0], id("k"))).to.be.revertedWithCustomError(
+          registry,
+          "NotCentre"
+        );
+      }
+      await expect(registry.connect(stranger).setCentreKey(NEW, id("k"))).to.be.revertedWithCustomError(
+        registry,
+        "NotCentre"
+      );
+    });
+
+    it("reverts BadList on a zero key and KeyFrozen once an exam froze the centre", async function () {
+      const { registry, operators } = await load(frozenFixture);
+      await registry.registerCentreOperator(NEW, operators[0].address, "New");
+      await expect(registry.connect(operators[0]).setCentreKey(NEW, ethers.ZeroHash)).to.be.revertedWithCustomError(
+        registry,
+        "BadList"
+      );
+      await expect(
+        registry.connect(operators[0]).setCentreKey(CENTRE_IDS[0], id("k"))
+      ).to.be.revertedWithCustomError(registry, "KeyFrozen");
+      expect((await registry.getCentre(CENTRE_IDS[0])).pubKey).to.equal(KEYS[0]);
+    });
+
+    it("freezeCentres reverts NoKey on a centre without a key, then accepts it once the key is set", async function () {
+      const { registry, operators } = await load(registeredFixture);
+      await registry.registerCentreOperator(NEW, operators[0].address, "New");
+      const ids = [CENTRE_IDS[1], NEW];
+      await expect(registry.freezeCentres(EXAM, ids, listRoot(ids), 2)).to.be.revertedWithCustomError(registry, "NoKey");
+      expect((await registry.getExam(EXAM)).frozen).to.equal(false);
+      expect((await registry.getCentre(CENTRE_IDS[1])).frozen).to.equal(false);
+      expect(await registry.examIds()).to.deep.equal([]);
+      await registry.connect(operators[0]).setCentreKey(NEW, id("k"));
+      await expect(registry.freezeCentres(EXAM, ids, listRoot(ids), 2)).to.emit(registry, "CentresFrozen");
+      expect((await registry.getCentre(NEW)).frozen).to.equal(true);
+    });
+  });
+
+  // ---------------------------------------------------------------- live testnet: role and listing views
+
+  describe("role and listing views", function () {
+    it("allCentres lists every registered centre once, in first registration order", async function () {
+      const { registry, operators } = await load(deployFixture);
+      expect(await registry.allCentres()).to.deep.equal([]);
+      for (let i = 0; i < 4; i++) await registry.registerCentre(CENTRE_IDS[i], KEYS[i], operators[i].address, CENTRES[i]);
+      await registry.registerCentre(CENTRE_IDS[0], id("k2"), operators[0].address, "again");
+      await registry.registerCentreOperator(CENTRE_IDS[1], operators[1].address, "again");
+      expect(await registry.allCentres()).to.deep.equal(CENTRE_IDS);
+    });
+
+    it("centreOfOperator follows registration, re-registration with a new operator and registerCentreOperator", async function () {
+      const { registry, operators, stranger } = await load(registeredFixture);
+      for (let i = 0; i < 4; i++) expect(await registry.centreOfOperator(operators[i].address)).to.equal(CENTRE_IDS[i]);
+      expect(await registry.centreOfOperator(stranger.address)).to.equal(ethers.ZeroHash);
+      await registry.registerCentre(CENTRE_IDS[0], KEYS[0], stranger.address, CENTRES[0]);
+      expect(await registry.centreOfOperator(stranger.address)).to.equal(CENTRE_IDS[0]);
+      expect(await registry.centreOfOperator(operators[0].address)).to.equal(ethers.ZeroHash);
+      await registry.registerCentreOperator(CENTRE_IDS[0], operators[0].address, CENTRES[0]);
+      expect(await registry.centreOfOperator(operators[0].address)).to.equal(CENTRE_IDS[0]);
+      expect(await registry.centreOfOperator(stranger.address)).to.equal(ethers.ZeroHash);
+      // Same operator again: the mapping stays.
+      await registry.registerCentreOperator(CENTRE_IDS[0], operators[0].address, "renamed");
+      expect(await registry.centreOfOperator(operators[0].address)).to.equal(CENTRE_IDS[0]);
+      // A re-registration of another centre does not clear an unrelated operator.
+      await registry.registerCentre(CENTRE_IDS[1], KEYS[1], stranger.address, CENTRES[1]);
+      expect(await registry.centreOfOperator(operators[0].address)).to.equal(CENTRE_IDS[0]);
+      expect(await registry.centreOfOperator(operators[1].address)).to.equal(ethers.ZeroHash);
+    });
+
+    it("examIds lists frozen exams in order, once each", async function () {
+      const { registry } = await load(frozenFixture);
+      const other = id("exam:physics-2026");
+      await registry.freezeCentres(other, CENTRE_IDS.slice(0, 2), listRoot(CENTRE_IDS.slice(0, 2)), 2);
+      await expect(registry.freezeCentres(EXAM, CENTRE_IDS, listRoot(CENTRE_IDS), 4)).to.be.revertedWithCustomError(
+        registry,
+        "AlreadyDone"
+      );
+      expect(await registry.examIds()).to.deep.equal([EXAM, other]);
+    });
+
+    it("committeesOf returns the committees and the reserve (empty before createExam)", async function () {
+      const f = await load(frozenFixture);
+      let r = await f.registry.committeesOf(EXAM);
+      expect(r.committees).to.deep.equal([]);
+      expect(r.reserve).to.equal(ethers.ZeroAddress);
+      const cur = Number(await f.registry.currentRound());
+      await f.registry.createExam(EXAM, cur + 10, cur + 20, cur + 30, cur + 40, f.committees.map((c) => c.address), f.reserve.address);
+      r = await f.registry.committeesOf(EXAM);
+      expect(r.committees).to.deep.equal(f.committees.map((c) => c.address));
+      expect(r.reserve).to.equal(f.reserve.address);
+    });
+  });
+
+  // ---------------------------------------------------------------- live testnet: package bytes on chain
+
+  describe("postPackageData", function () {
+    const MAX_DATA = 64 * 1024;
+    const bytes = (n, fill = 0x61) => new Uint8Array(n).fill(fill);
+
+    // A set bundle shaped like the repo's sealed files: 4 armored centre copies (2449 B),
+    // the public copy (2177 B) and index.json (1277 B), as {"files": {...}} UTF-8 JSON.
+    function realisticBundle() {
+      const armor = (n) => {
+        const body = ethers.encodeBase64(ethers.randomBytes(n)).match(/.{1,64}/g).join("\n");
+        return `-----BEGIN AGE ENCRYPTED FILE-----\n${body}\n-----END AGE ENCRYPTED FILE-----\n`;
+      };
+      const files = { "index.json": JSON.stringify({ pad: "x".repeat(1240) }, null, 2) + "\n", "public.tlock": armor(1557) };
+      for (const cid of CENTRE_IDS) files[`${cid}.tlock`] = armor(1757);
+      return ethers.toUtf8Bytes(JSON.stringify({ files }));
+    }
+
+    it("emits PackageData with parts 0, 1, ... and records each part's block", async function () {
+      const f = await load(createdFixture);
+      const c = f.registry.connect(f.committees[1]);
+      const tx0 = await c.postPackageData(EXAM, 1, "0x0102");
+      await expect(tx0).to.emit(f.registry, "PackageData").withArgs(EXAM, 1, 0, "0x0102");
+      const tx1 = await c.postPackageData(EXAM, 1, "0x03");
+      await expect(tx1).to.emit(f.registry, "PackageData").withArgs(EXAM, 1, 1, "0x03");
+      const blocks = [(await tx0.wait()).blockNumber, (await tx1.wait()).blockNumber];
+      expect((await f.registry.packageDataBlocks(EXAM, 1)).map(Number)).to.deep.equal(blocks);
+      expect(await f.registry.packageDataBlocks(EXAM, 0)).to.deep.equal([]);
+      // Reserve posts for index setCount.
+      await expect(f.registry.connect(f.reserve).postPackageData(EXAM, 4, "0x04"))
+        .to.emit(f.registry, "PackageData")
+        .withArgs(EXAM, 4, 0, "0x04");
+    });
+
+    it("lets a reader fetch the bytes with eth_getLogs on exactly the recorded block", async function () {
+      const f = await load(createdFixture);
+      const data = realisticBundle();
+      await f.registry.connect(f.committees[0]).postPackageData(EXAM, 0, data);
+      await f.registry.connect(f.committees[2]).postPackageData(EXAM, 2, "0x99"); // another set, ignored by the filter
+      const [block] = (await f.registry.packageDataBlocks(EXAM, 0)).map(Number);
+      const filter = f.registry.filters.PackageData(EXAM, 0);
+      const logs = await f.registry.queryFilter(filter, block, block);
+      expect(logs.length).to.equal(1);
+      expect(logs[0].args.part).to.equal(0);
+      expect(logs[0].args.data).to.equal(ethers.hexlify(data));
+      expect(JSON.parse(ethers.toUtf8String(logs[0].args.data)).files["public.tlock"]).to.match(/^-----BEGIN AGE/);
+    });
+
+    it("reports the gas of a realistic 13 KB set payload", async function () {
+      const f = await load(createdFixture);
+      const data = realisticBundle();
+      const r = await (await f.registry.connect(f.committees[0]).postPackageData(EXAM, 0, data)).wait();
+      const zeros = data.filter((b) => b === 0).length;
+      console.log(`      postPackageData: ${data.length} bytes (${zeros} zero bytes), gasUsed ${r.gasUsed} (${(Number(r.gasUsed) / data.length).toFixed(1)} gas/byte)`);
+      const big = bytes(MAX_DATA);
+      const r2 = await (await f.registry.connect(f.committees[1]).postPackageData(EXAM, 1, big)).wait();
+      console.log(`      postPackageData: ${big.length} bytes (MAX_DATA), gasUsed ${r2.gasUsed}`);
+      expect(data.length).to.be.within(12000, 15000);
+    });
+
+    it("reverts NotCommittee for a wrong committee, the office, a stranger, a wrong reserve index or an unknown exam", async function () {
+      const f = await load(createdFixture);
+      for (const s of [f.committees[1], f.office, f.stranger, f.reserve]) {
+        await expect(f.registry.connect(s).postPackageData(EXAM, 0, "0x01")).to.be.revertedWithCustomError(
+          f.registry,
+          "NotCommittee"
+        );
+      }
+      await expect(f.registry.connect(f.committees[0]).postPackageData(EXAM, 4, "0x01")).to.be.revertedWithCustomError(
+        f.registry,
+        "NotCommittee"
+      );
+      await expect(f.registry.connect(f.reserve).postPackageData(EXAM, 5, "0x01")).to.be.revertedWithCustomError(
+        f.registry,
+        "NotCommittee"
+      );
+      await expect(
+        f.registry.connect(f.committees[0]).postPackageData(id("exam:none"), 0, "0x01")
+      ).to.be.revertedWithCustomError(f.registry, "NotCommittee");
+    });
+
+    it("reverts BadList on empty data or more than MAX_DATA bytes, accepts exactly MAX_DATA", async function () {
+      const f = await load(createdFixture);
+      const c = f.registry.connect(f.committees[0]);
+      await expect(c.postPackageData(EXAM, 0, "0x")).to.be.revertedWithCustomError(f.registry, "BadList");
+      await expect(c.postPackageData(EXAM, 0, bytes(MAX_DATA + 1))).to.be.revertedWithCustomError(f.registry, "BadList");
+      await expect(c.postPackageData(EXAM, 0, bytes(MAX_DATA))).to.emit(f.registry, "PackageData");
+      expect((await f.registry.packageDataBlocks(EXAM, 0)).length).to.equal(1);
+    });
+
+    it("reverts BadList beyond MAX_PARTS (64) parts", async function () {
+      const f = await load(createdFixture);
+      const c = f.registry.connect(f.committees[0]);
+      for (let i = 0; i < 64; i++) await c.postPackageData(EXAM, 0, "0x01");
+      await expect(c.postPackageData(EXAM, 0, "0x01")).to.be.revertedWithCustomError(f.registry, "BadList");
+      expect((await f.registry.packageDataBlocks(EXAM, 0)).length).to.equal(64);
+    });
+
+    it("reverts AlreadyDone once the set's root is submitted (parts are final)", async function () {
+      const f = await load(createdFixture);
+      const c = f.registry.connect(f.committees[0]);
+      await c.postPackageData(EXAM, 0, "0x01");
+      await c.submitPackage(EXAM, 0, id("root"), "chain:");
+      await expect(c.postPackageData(EXAM, 0, "0x02")).to.be.revertedWithCustomError(f.registry, "AlreadyDone");
+      const p = await f.registry.packageOf(EXAM, 0);
+      expect(p.uri).to.equal("chain:");
+    });
+
+    it("accepts a part in the last second before openRound, reverts TooLate at openRound", async function () {
+      const f = await load(createdFixture);
+      const c = f.registry.connect(f.committees[0]);
+      await nextTxJustBefore(f.rounds.open);
+      await expect(c.postPackageData(EXAM, 0, "0x01")).to.emit(f.registry, "PackageData");
+      await nextTxAtRound(f.rounds.open);
+      await expect(c.postPackageData(EXAM, 0, "0x02")).to.be.revertedWithCustomError(f.registry, "TooLate");
+      // The reserve may still post until reserveOpenRound.
+      await expect(f.registry.connect(f.reserve).postPackageData(EXAM, 4, "0x01")).to.emit(f.registry, "PackageData");
+      await nextTxAtRound(f.rounds.rOpen);
+      await expect(f.registry.connect(f.reserve).postPackageData(EXAM, 4, "0x02")).to.be.revertedWithCustomError(
+        f.registry,
+        "TooLate"
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------- live testnet: batched view
+
+  describe("examSnapshot", function () {
+    it("returns empty lists for an unknown exam and centres only for a frozen, not created exam", async function () {
+      const f = await load(frozenFixture);
+      let s = await f.registry.examSnapshot(id("exam:none"));
+      expect(s.exam.frozen).to.equal(false);
+      expect(s.centres.length + s.packages.length + s.participations.length).to.equal(0);
+      s = await f.registry.examSnapshot(EXAM);
+      expect(s.exam.frozen).to.equal(true);
+      expect(s.centres.map((c) => c.centreId)).to.deep.equal(CENTRE_IDS);
+      expect(s.packages.length).to.equal(0);
+      expect(s.participations.map((p) => p.joined)).to.deep.equal([false, false, false, false]);
+    });
+
+    it("matches the individual views on a full exam", async function () {
+      const f = await load(createdFixture);
+      const { registry } = f;
+      await registry.connect(f.operators[1]).joinExam(EXAM, CENTRE_IDS[1], id("rc1"), ethers.toUtf8Bytes("x".repeat(600)));
+      await registry.connect(f.committees[0]).postPackageData(EXAM, 0, "0x0102");
+      await registry.connect(f.committees[0]).submitPackage(EXAM, 0, id("root0"), "chain:");
+      await registry.connect(f.reserve).submitPackage(EXAM, 4, id("rootR"), "packages/R/index.json");
+      await registry.connect(f.committees[3]).burnSet(EXAM, 3);
+
+      const s = await registry.examSnapshot(EXAM);
+      expect(s.exam).to.deep.equal(await registry.getExam(EXAM));
+      for (let i = 0; i < 4; i++) {
+        const c = await registry.getCentre(CENTRE_IDS[i]);
+        expect([s.centres[i].centreId, s.centres[i].pubKey, s.centres[i].operator, s.centres[i].name, s.centres[i].frozen]).to.deep.equal([
+          CENTRE_IDS[i],
+          c.pubKey,
+          c.operator,
+          c.name,
+          c.frozen,
+        ]);
+        const p = await registry.participation(EXAM, CENTRE_IDS[i]);
+        expect([s.participations[i].rcCommit, s.participations[i].tlockedRc, s.participations[i].joined]).to.deep.equal([
+          p.rcCommit,
+          p.tlockedRc,
+          p.joined,
+        ]);
+      }
+      expect(s.packages.length).to.equal(5);
+      for (let i = 0; i <= 4; i++) {
+        const p = await registry.packageOf(EXAM, i);
+        const k = s.packages[i];
+        expect([k.root, k.uri, k.committee]).to.deep.equal([p.root, p.uri, p.committee]);
+        expect(k.burned).to.equal(await registry.isBurned(EXAM, i));
+        expect(k.dataBlocks).to.deep.equal(await registry.packageDataBlocks(EXAM, i));
+      }
+      expect(s.packages[3].burned).to.equal(true);
+      expect(s.packages[0].dataBlocks.length).to.equal(1);
+      const gas = await registry.examSnapshot.estimateGas(EXAM);
+      console.log(`      examSnapshot (4 centres, 5 sets): estimateGas ${gas}`);
+      expect(gas).to.be.below(1_000_000n);
+    });
+  });
+
   // ---------------------------------------------------------------- safety
 
   describe("safety", function () {
