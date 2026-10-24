@@ -1,0 +1,20 @@
+{
+  "name": "@sealhour/scripts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SealHour local tooling: drand compatible beacon relay, demo seeding, end to end CLI demo.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "beacon": "node beacon-server.mjs",
+    "seed": "node seed-demo.mjs",
+    "demo": "node demo-cli.mjs"
+  },
+  "dependencies": {
+    "@sealhour/seal": "file:../packages/seal",
+    "ethers": "6.17.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
