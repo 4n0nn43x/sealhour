@@ -1,23 +1,17 @@
 "use client";
-// Page frame (dashboard layout ported from the admin template: topbar, sidenav, page title, footer),
-// demo badge, role selector, theme toggle, and the config gate.
+// Page frame (Osen dashboard layout: topbar, sidenav, page title, footer) and the config gate.
+// Topbar: exam PhaseStepper, demo badge, theme toggle, ActingAs. Sidenav: Overview and the four roles, the one
+// whose work is due now carries a "now" badge. With a loaded config the whole page sits in a PhaseProvider.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useApp } from "./Providers";
 import { useI18n } from "@/lib/i18n";
-import type { DictKey } from "@/lib/dict";
-import type { Role, RoleKind } from "@/lib/roles";
 import { storage } from "@/lib/storage";
+import { PhaseProvider, useOptionalPhase } from "@/lib/usePhase";
+import { ActingAs, DUE, KIND, PhaseStepper } from "./Header";
+import { Icon } from "./Icon";
 import { Loading, Notice } from "./ui";
-
-const NAV: { href: string; key: DictKey; icon: string }[] = [
-  { href: "/", key: "nav.overview", icon: "ti-layout-dashboard" },
-  { href: "/enrolment/", key: "nav.enrolement", icon: "ti-building-community" },
-  { href: "/committee/", key: "nav.comite", icon: "ti-users-group" },
-  { href: "/centre/", key: "nav.centre", icon: "ti-school" },
-  { href: "/public/", key: "nav.public", icon: "ti-world" },
-];
 
 // Layout attributes on <html>: defaults in app/layout.tsx (first paint script there too), kept up to date here.
 export const THEME_KEY = "sealhour.theme";
@@ -73,73 +67,31 @@ function toggleTheme() {
   storage.set(THEME_KEY, next);
 }
 
-export function roleLabel(r: Role, t: (k: DictKey, v?: Record<string, string | number>) => string): string {
-  switch (r.kind) {
-    case "office":
-      return t("role.office");
-    case "committee":
-      return t("role.committee", { label: r.name });
-    case "centre":
-      return t("role.centre", { name: r.name });
-    default:
-      return t("role.juror");
-  }
-}
-
-export function RoleSelect({ kinds, label }: { kinds?: RoleKind[]; label?: string }) {
-  const { roles, role, setRole } = useApp();
-  const { t } = useI18n();
-  const list = kinds ? roles.filter((r) => kinds.includes(r.kind)) : roles;
-  if (list.length === 0) return null;
-  const value = role && list.some((r) => r.key === role.key) ? role.key : "";
-  return (
-    <label className="d-inline-flex align-items-center gap-2 mb-0">
-      <span className={kinds ? "text-nowrap" : "text-nowrap d-none d-sm-inline"}>{label ?? t("role.label")}</span>
-      <select
-        className="form-select form-select-sm w-auto"
-        aria-label={label ?? t("role.label")}
-        value={value}
-        onChange={(e) => setRole(e.target.value)}
-        data-testid={kinds ? `role-${kinds.join("-")}` : "role"}
-      >
-        {value === "" ? <option value="">{t("role.choose")}</option> : null}
-        {list.map((r) => (
-          <option key={r.key} value={r.key}>
-            {roleLabel(r, t)}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 function Topbar({ onToggle }: { onToggle: () => void }) {
   const { t } = useI18n();
   const { config } = useApp();
+  const ok = config?.status === "ok";
   return (
     <header className="app-topbar">
-      <div className="page-container topbar-menu">
-        <div className="d-flex align-items-center gap-2">
+      <div className="page-container topbar-menu gap-2">
+        <div className="d-flex align-items-center gap-2 min-w-0">
           <button type="button" className="sidenav-toggle-button px-2" onClick={onToggle} aria-label={t("nav.toggle")}>
             <i className="ti ti-menu-deep fs-24" aria-hidden="true" />
           </button>
-          {config?.status === "ok" ? (
-            <span className="badge badge-soft-warning text-uppercase fs-12" title={t("demo.badgeTitle")} data-testid="demo-badge">
-              {t("demo.badge")}
-            </span>
-          ) : null}
+          {ok ? <PhaseStepper /> : null}
         </div>
         <div className="d-flex align-items-center gap-2">
-          {config?.status === "ok" ? (
-            <div className="topbar-item">
-              <RoleSelect />
-            </div>
+          {ok ? (
+            <span className="badge badge-soft-warning text-uppercase fs-11 d-none d-sm-inline-block" title={t("demo.badgeTitle")} data-testid="demo-badge">
+              {t("demo.badge")}
+            </span>
           ) : null}
           <div className="topbar-item">
             <button type="button" className="topbar-link" id="light-dark-mode" onClick={toggleTheme} aria-label={t("theme.toggle")} title={t("theme.toggle")}>
               <i className="ti ti-moon fs-22" aria-hidden="true" />
             </button>
           </div>
+          {ok ? <ActingAs /> : null}
         </div>
       </div>
     </header>
@@ -149,14 +101,35 @@ function Topbar({ onToggle }: { onToggle: () => void }) {
 function Sidenav({ onPin, onClose }: { onPin: () => void; onClose: () => void }) {
   const { t } = useI18n();
   const path = usePathname() ?? "/";
+  const phase = useOptionalPhase();
+  const due = phase && phase.snap ? DUE[phase.phase] : null;
+  const item = (href: string, label: string, ti: string, badge?: ReactNode) => {
+    const active = href === "/" ? path === "/" : path.startsWith(href.slice(0, -1));
+    return (
+      <li key={href} className={active ? "side-nav-item active" : "side-nav-item"}>
+        <Link href={href} className={active ? "side-nav-link active" : "side-nav-link"} aria-current={active ? "page" : undefined} onClick={onClose}>
+          <span className="menu-icon">
+            <i className={`ti ${ti}`} aria-hidden="true" />
+          </span>
+          <span className="menu-text">{label}</span>
+          {badge}
+        </Link>
+      </li>
+    );
+  };
   return (
     <div className="sidenav-menu">
       <Link href="/" className="logo">
         <span className="logo-lg">
-          <i className="ti ti-lock" aria-hidden="true" /> SealHour
+          <span className="logo-mark" aria-hidden="true">
+            <Icon name="lock-keyhole-bold-duotone" />
+          </span>
+          SealHour
         </span>
         <span className="logo-sm">
-          <i className="ti ti-lock" aria-hidden="true" />
+          <span className="logo-mark" aria-hidden="true">
+            <Icon name="lock-keyhole-bold-duotone" />
+          </span>
           <span className="visually-hidden">SealHour</span>
         </span>
       </Link>
@@ -168,20 +141,21 @@ function Sidenav({ onPin, onClose }: { onPin: () => void; onClose: () => void })
       </button>
       <nav className="sidenav-scroll" aria-label={t("nav.aria")}>
         <ul className="side-nav">
-          <li className="side-nav-title">{t("nav.aria")}</li>
-          {NAV.map((n) => {
-            const active = n.href === "/" ? path === "/" : path.startsWith(n.href.slice(0, -1));
-            return (
-              <li key={n.href} className={active ? "side-nav-item active" : "side-nav-item"}>
-                <Link href={n.href} className={active ? "side-nav-link active" : "side-nav-link"} aria-current={active ? "page" : undefined} onClick={onClose}>
-                  <span className="menu-icon">
-                    <i className={`ti ${n.icon}`} aria-hidden="true" />
-                  </span>
-                  <span className="menu-text">{t(n.key)}</span>
-                </Link>
-              </li>
-            );
-          })}
+          <li className="side-nav-title">SealHour</li>
+          {item("/", t("nav.overview"), "ti-layout-dashboard")}
+          <li className="side-nav-title mt-2">{t("nav.roles")}</li>
+          {(["office", "committee", "centre", "juror"] as const).map((k) =>
+            item(
+              KIND[k].href,
+              t(KIND[k].title),
+              KIND[k].ti,
+              due === k ? (
+                <span className="badge bg-success rounded-pill" title={t("home.doNow")}>
+                  {t("nav.now")}
+                </span>
+              ) : undefined,
+            ),
+          )}
         </ul>
       </nav>
     </div>
@@ -244,8 +218,9 @@ export function RequireConfig({ children }: { children: ReactNode }) {
 
 export function Page({ title, intro, children, needsConfig = true }: { title: string; intro?: string; children: ReactNode; needsConfig?: boolean }) {
   const { t } = useI18n();
+  const { config } = useApp();
   const layout = useLayout();
-  return (
+  const frame = (
     <div className="wrapper">
       <Topbar onToggle={layout.toggle} />
       <Sidenav onPin={layout.pin} onClose={layout.close} />
@@ -260,10 +235,16 @@ export function Page({ title, intro, children, needsConfig = true }: { title: st
           <div className="page-container">
             <div className="row">
               <div className="col-12 text-center text-md-start text-muted">{t("footer.text")}</div>
+              <div className="col-12 text-center text-md-start text-muted fs-12">
+                <a href="https://github.com/480-Design/Solar-Icon-Set" className="text-reset" target="_blank" rel="noreferrer">
+                  {t("footer.credits")}
+                </a>
+              </div>
             </div>
           </div>
         </footer>
       </div>
     </div>
   );
+  return config?.status === "ok" ? <PhaseProvider>{frame}</PhaseProvider> : frame;
 }

@@ -1,5 +1,7 @@
 "use client";
-// App wide state: runtime config (fetched once), language, and the acting demo role.
+// App wide state: runtime config (fetched once), language, and the acting demo role (the one source of truth
+// for the actor: useApp().role). On /public/ the actor is always the keyless public juror, whatever was picked.
+import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { loadConfig, type AppConfig, type ConfigResult } from "@/lib/config";
 import { I18nProvider } from "@/lib/i18n";
@@ -34,7 +36,8 @@ export function Providers({ children }: { children: ReactNode }) {
 
   const cfg = config?.status === "ok" ? config.config : null;
   const roles = useMemo(() => (cfg ? listRoles(cfg) : []), [cfg]);
-  const role = useMemo(() => (cfg ? findRole(cfg, roleKey) ?? roles[0] : undefined), [cfg, roleKey, roles]);
+  const isPublic = (usePathname() ?? "/").startsWith("/public");
+  const role = useMemo(() => (cfg ? findRole(cfg, isPublic ? "juror" : roleKey) ?? roles[0] : undefined), [cfg, roleKey, roles, isPublic]);
   const setRole = useCallback((key: string) => {
     setRoleKey(key);
     storage.set(ROLE_KEY, key);

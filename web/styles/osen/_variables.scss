@@ -603,7 +603,7 @@ $aspect-ratios: (
 
 // scss-docs-start font-variables
 // stylelint-disable value-keyword-case
-$font-family-sans-serif:      'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+$font-family-sans-serif:      'Inter Variable', 'Inter', sans-serif; // SealHour port: Inter bundled locally (@fontsource-variable/inter)
 $font-family-monospace:       SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 // stylelint-enable value-keyword-case
 $font-family-base:            var(--#{$prefix}font-sans-serif);

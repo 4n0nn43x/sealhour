@@ -33,11 +33,19 @@ File: App Css File
 @import "components/buttons";
 @import "components/badge";
 @import "components/card";
+@import "components/dropdown";
 @import "components/forms";
 @import "components/nav";
+@import "components/popover";
 @import "components/print";
 @import "components/reboot";
+@import "components/switch";
 @import "components/tables";
+@import "components/steps";
+@import "components/widgets";
+
+// Pages
+@import "pages/timeline";
 
 // Icons
 @import "icons";

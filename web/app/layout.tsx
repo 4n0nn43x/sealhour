@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Providers } from "@/components/Providers";
+import "@fontsource-variable/inter/wght.css";
 import "../styles/osen/app.scss";
 import "./globals.css";
 

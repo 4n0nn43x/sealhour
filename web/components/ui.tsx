@@ -7,20 +7,6 @@ import { explainError } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
 import type { AppConfig } from "@/lib/config";
 
-export function Section({ title, children, id, aside }: { title: string; children: ReactNode; id?: string; aside?: ReactNode }) {
-  return (
-    <section className="card" id={id} aria-labelledby={id ? `${id}-title` : undefined}>
-      <div className="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-        <h2 className="header-title" id={id ? `${id}-title` : undefined}>
-          {title}
-        </h2>
-        {aside}
-      </div>
-      <div className="card-body pt-0">{children}</div>
-    </section>
-  );
-}
-
 const ALERT = { info: "info", ok: "success", warn: "warning", error: "danger" } as const;
 
 export function Notice({ tone = "info", children, testId }: { tone?: "info" | "ok" | "warn" | "error"; children: ReactNode; testId?: string }) {

@@ -35,6 +35,11 @@ export function formatTime(ms: number, locale: string): string {
   return new Date(ms).toLocaleString(locale, { dateStyle: "short", timeStyle: "medium" });
 }
 
+/** Hours and minutes of an epoch ms time, e.g. "14:32". */
+export function hm(ms: number, locale: string): string {
+  return new Date(ms).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+}
+
 export function formatDuration(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
   const h = Math.floor(s / 3600);

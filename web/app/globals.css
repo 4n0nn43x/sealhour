@@ -140,3 +140,178 @@ pre.code {
     padding: 0;
   }
 }
+
+/* ---- UX redesign (phase 1): shell and building blocks, on Osen tokens. */
+.min-w-0 {
+  min-width: 0;
+}
+.sidenav-menu .logo .logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--bs-primary);
+  color: #fff;
+  font-size: 22px;
+  vertical-align: middle;
+}
+html[data-sidenav-size="condensed"] .sidenav-menu .logo .logo-mark,
+html[data-sidenav-size="sm-hover"] .sidenav-menu .logo .logo-mark {
+  margin-right: 0;
+}
+
+/* Topbar exam stepper: compact Osen steps (dot, label, countdown), connectors between them. */
+.phase-step {
+  align-items: center;
+  gap: 8px;
+}
+.phase-line {
+  width: 28px;
+  height: 2px;
+  margin-right: 4px;
+  background: var(--bs-border-color);
+  border-radius: 2px;
+}
+.phase-done .phase-line,
+.phase-current .phase-line {
+  background: var(--bs-primary);
+}
+.phase-dot .avatar-title {
+  background: var(--bs-light);
+  color: var(--bs-secondary-color);
+}
+.phase-done .phase-dot .avatar-title {
+  background: var(--bs-success-bg-subtle);
+  color: var(--bs-success);
+}
+.phase-current .phase-dot .avatar-title {
+  background: var(--bs-primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px var(--bs-primary-bg-subtle);
+}
+.phase-current .fw-medium {
+  color: var(--bs-primary);
+}
+.phase-future {
+  opacity: 0.75;
+}
+.phase-pop {
+  top: calc(100% + 14px);
+  left: 0;
+  right: auto;
+}
+.acting-menu {
+  width: 290px;
+  top: 100%;
+  right: 0;
+}
+.acting-menu .btn-icon {
+  width: 34px;
+}
+.nav-user .topbar-link {
+  min-height: var(--bs-topbar-height, 70px);
+}
+
+/* Numbered steps: a rail with numbered dots at the left, a card per step (Osen timeline look). */
+.step-list {
+  counter-reset: step;
+  position: relative;
+}
+.step {
+  counter-increment: step;
+  position: relative;
+  padding-left: 52px;
+}
+.step::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 40px;
+  bottom: 0;
+  width: 2px;
+  background: var(--bs-border-color);
+}
+.step:last-child::before {
+  display: none;
+}
+.step-done::before {
+  background: var(--bs-success);
+  opacity: 0.4;
+}
+.step-num {
+  position: absolute;
+  left: 0;
+  top: 14px;
+}
+.step-num .avatar-title:empty::before {
+  content: counter(step);
+}
+.step-done .step-num .avatar-title {
+  background: var(--bs-success-bg-subtle);
+  color: var(--bs-success);
+}
+.step-current .step-num .avatar-title {
+  background: var(--bs-primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px var(--bs-primary-bg-subtle);
+}
+.step-future .step-num .avatar-title {
+  background: var(--bs-light);
+  color: var(--bs-secondary-color);
+}
+/* Future steps: muted without opacity, so their text keeps its contrast. */
+.step-future .card {
+  background: var(--bs-tertiary-bg);
+  box-shadow: none;
+}
+/* Quiet controls (step Show/Hide, "Verify it yourself") at WCAG AA: the template's secondary text (#9ba6b7) is
+   2.5:1 on white; Bootstrap's own secondary text rgba(33, 37, 41, 0.75) is 6.7:1. Dark: the template's #8391a2
+   is 5.1:1 on the card. */
+.text-quiet {
+  color: rgba(33, 37, 41, 0.75) !important;
+}
+[data-bs-theme="dark"] .text-quiet {
+  color: var(--bs-secondary-color) !important;
+}
+.step-current .card {
+  box-shadow: 0 0 0 1px var(--bs-primary-border-subtle), var(--bs-box-shadow);
+}
+/* Phones: a narrower rail so the cards keep their width. */
+@media (max-width: 575.98px) {
+  .step {
+    padding-left: 34px;
+  }
+  .step::before {
+    left: 11px;
+    top: 36px;
+  }
+  .step-num {
+    top: 16px;
+  }
+  .step-num.avatar-sm {
+    height: 24px;
+    width: 24px;
+    font-size: 12px;
+  }
+}
+
+/* Role cards on the home page. */
+.role-card {
+  transition: box-shadow 0.2s ease-out, transform 0.2s ease-out;
+}
+.role-card:hover {
+  transform: translateY(-2px);
+}
+.role-card.is-due {
+  box-shadow: 0 0 0 1px var(--bs-primary-border-subtle), var(--bs-box-shadow);
+}
+@media (prefers-reduced-motion: reduce) {
+  .role-card,
+  .role-card:hover {
+    transition: none;
+    transform: none;
+  }
+}

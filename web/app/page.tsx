@@ -1,65 +1,176 @@
 "use client";
+// Home: "Who are you?" role cards with a "Do this now" hint from the exam phase, the exam status, How it works.
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { Page } from "@/components/Shell";
+import { useState } from "react";
+import { Page, SetupMessage } from "@/components/Shell";
 import { useApp, useConfig } from "@/components/Providers";
-import { useBeacon } from "@/lib/beacon";
-import { formatDuration, formatTime, useI18n } from "@/lib/i18n";
-import { burnedIndexes, submittedIndexes } from "@/lib/registry";
-import { useSnapshot } from "@/lib/useSnapshot";
-import { roundTime } from "@sealhour/seal";
-import { SetupMessage } from "@/components/Shell";
+import { DUE, KIND } from "@/components/Header";
+import { Icon } from "@/components/Icon";
+import { ExamTimeline } from "@/components/blocks";
+import { ErrorBox } from "@/components/ui";
 import type { DictKey } from "@/lib/dict";
+import { formatDuration, hm, useI18n, type TFn } from "@/lib/i18n";
+import type { RoleKind } from "@/lib/roles";
+import { usePhase, type PhaseState } from "@/lib/usePhase";
 
-const SCREENS: { href: string; title: DictKey; body: DictKey; icon: string }[] = [
-  { href: "/enrolment/", title: "nav.enrolement", body: "home.enrolement", icon: "ti-building-community" },
-  { href: "/committee/", title: "nav.comite", body: "home.comite", icon: "ti-users-group" },
-  { href: "/centre/", title: "nav.centre", body: "home.centre", icon: "ti-school" },
-  { href: "/public/", title: "nav.public", body: "home.public", icon: "ti-world" },
-];
+const KINDS: RoleKind[] = ["office", "committee", "centre", "juror"];
 
-function Stat({ label, icon, value, sub }: { label: string; icon: string; value: ReactNode; sub?: ReactNode }) {
+function hint(kind: RoleKind, p: PhaseState, t: TFn, time: (ms: number) => string): string {
+  const open = p.milestones.find((m) => m.key === "open");
+  const reserve = p.milestones.find((m) => m.key === "reserveOpen");
+  switch (kind) {
+    case "office":
+      return t(p.phase === "setup" ? "home.hint.office.setup" : "home.hint.office.done");
+    case "committee":
+      if (p.phase === "setup") return t("home.hint.committee.setup");
+      if (p.phase !== "sealing") return t("home.hint.committee.after");
+      return p.sealed < p.packages ? t("home.hint.committee.sealing", { n: p.sealed, m: p.packages }) : t("home.hint.committee.allSealed");
+    case "centre":
+      if (p.phase === "setup" || !open) return t("home.hint.committee.setup");
+      if (p.phase === "sealing") return t("home.hint.centre.before", { time: time(open.atMs) });
+      if (p.phase === "open") return t("home.hint.centre.open");
+      if (p.phase === "revealed") return t("home.hint.centre.revealed", { time: reserve ? time(reserve.atMs) : "-" });
+      return t("home.hint.centre.reserve");
+    default:
+      return t(p.phase === "reserve" ? "home.hint.public.revealed" : (`home.hint.public.${p.phase}` as DictKey));
+  }
+}
+
+function RoleCards({ p }: { p: PhaseState | null }) {
+  const { t, locale } = useI18n();
+  const time = (ms: number) => hm(ms, locale);
+  const due = p?.snap ? DUE[p.phase] : null;
   return (
-    <div className="col">
-      <div className="card">
-        <div className="card-body">
-          <div className="text-muted fs-13 text-uppercase fw-semibold">{label}</div>
-          <div className="d-flex align-items-center justify-content-center gap-2 my-2 py-1">
-            <div className="avatar-md flex-shrink-0">
-              <span className="avatar-title text-bg-primary rounded-circle fs-22">
-                <i className={`ti ${icon}`} aria-hidden="true" />
-              </span>
+    <ul className="row row-cols-md-2 row-cols-1 list-unstyled mb-0" aria-label={t("home.who")}>
+      {KINDS.map((k) => {
+        const K = KIND[k];
+        const isDue = due === k;
+        return (
+          <li key={k} className="col d-flex">
+            <div className={`card role-card position-relative w-100 ${isDue ? "is-due" : ""}`}>
+              <div className="card-body">
+                <div className="d-flex align-items-start gap-3">
+                  <div className="avatar-lg bg-primary bg-opacity-10 rounded flex-shrink-0">
+                    <span className="avatar-title text-primary fs-32">
+                      <Icon name={K.icon} />
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="card-title fs-16 fw-semibold mb-1">{t(K.title)}</h2>
+                    <p className="text-muted mb-0">{t(K.sub)}</p>
+                  </div>
+                </div>
+                {p?.snap ? (
+                  <p className={`mt-3 mb-0 ${isDue ? "text-body fw-medium" : "text-muted"}`}>
+                    {isDue ? <span className="badge badge-soft-success px-2 py-1 me-2">{t("home.doNow")}</span> : <i className="ti ti-point-filled me-1 text-primary" aria-hidden="true" />}
+                    {hint(k, p, t, time)}
+                  </p>
+                ) : null}
+              </div>
+              <div className="card-footer border-top border-dashed mt-auto">
+                <Link href={K.href} className="link-primary fw-medium stretched-link">
+                  {t("home.go", { page: t(K.title) })} <i className="ti ti-arrow-right" aria-hidden="true" />
+                </Link>
+              </div>
             </div>
-            <div className="h3 mb-0 fw-bold tabular">{value}</div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function ExamStatus() {
+  const cfg = useConfig();
+  const { t } = useI18n();
+  const p = usePhase();
+  const e = p.snap?.exam;
+  const order = ["setup", "sealing", "open", "revealed", "reserve"] as const;
+  const at = order.indexOf(p.phase);
+  const labels: DictKey[] = ["phase.listFrozen", "phase.sealing", "phase.opening", "phase.reveal", "phase.reserve"];
+  const strip: { label: string; value: string; icon: string; tone: string }[] = [
+    { label: t("home.statCentres"), value: e?.frozen ? `${e.centreCount} / ${cfg.demo.announcedCentreCount}` : "-", icon: "ti-building", tone: "text-primary" },
+    { label: t("home.statSealed"), value: p.packages ? `${p.sealed} / ${p.packages}` : "-", icon: "ti-lock", tone: "text-success" },
+    { label: t("home.statBurned"), value: e?.created ? String(p.burned.length) : "-", icon: "ti-flame", tone: "text-danger" },
+    { label: p.next ? t(p.next.label) : t("home.statNext"), value: p.next ? formatDuration(p.leftMs) : "-", icon: "ti-hourglass", tone: "text-warning" },
+  ];
+  return (
+    <div className="card">
+      <div className="card-header d-flex justify-content-between align-items-center border-bottom border-dashed">
+        <h2 className="header-title">{t("home.statusTitle")}</h2>
+        <span className="badge badge-soft-primary px-2 py-1 fs-12">{t(`phase.${p.phase}` as DictKey)}</span>
+      </div>
+      <div className="px-5 pt-2">
+        <div className="horizontal-steps mt-3 mb-3 pb-4" aria-hidden="true">
+          <div className="horizontal-steps-content">
+            {labels.map((l, i) => (
+              <div key={l} className={`step-item ${i === at ? "current" : ""}`}>
+                <span>{t(l)}</span>
+              </div>
+            ))}
           </div>
-          <p className="mb-0 text-muted text-truncate">{sub ?? " "}</p>
+          <div className="process-line" style={{ width: `${(at / (labels.length - 1)) * 100}%` }} />
+        </div>
+      </div>
+      <div className="bg-light bg-opacity-50">
+        <div className="row text-center g-0">
+          {strip.map((s) => (
+            <div key={s.label} className="col-md-3 col-6">
+              <p className="text-muted mt-3 mb-1">{s.label}</p>
+              <p className="h4 mb-3 tabular">
+                <i className={`ti ${s.icon} ${s.tone} me-1`} aria-hidden="true" />
+                {s.value}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
 }
 
-/** Stat cards from the exam's on chain snapshot and the beacon clock (only with a loaded config). */
-function Stats() {
-  const cfg = useConfig();
-  const { t, locale } = useI18n();
-  const b = useBeacon(cfg);
-  const { snap } = useSnapshot(cfg, cfg.demo.examId);
-  const e = snap?.exam;
-  const next = e ? (b.round < e.openRound ? { key: "rounds.open" as const, round: e.openRound } : { key: "rounds.reveal" as const, round: e.revealRound }) : null;
-  const at = next ? roundTime({ genesis_time: b.genesis, period: b.period } as Parameters<typeof roundTime>[0], next.round) : 0;
+function HowItWorks() {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
   return (
-    <div className="row row-cols-xxl-4 row-cols-md-2 row-cols-1 text-center">
-      <Stat label={t("home.statCentres")} icon="ti-building" value={snap ? snap.centres.length : "-"} sub={`${t("enrol.announced")}: ${cfg.demo.announcedCentreCount}`} />
-      <Stat label={t("home.statPackages")} icon="ti-package" value={snap && e?.created ? `${submittedIndexes(snap).length} / ${snap.packages.length}` : "-"} />
-      <Stat label={t("home.statBurned")} icon="ti-flame" value={snap && e?.created ? burnedIndexes(snap).length : "-"} />
-      <Stat
-        label={next ? t("home.statRound", { label: t(next.key), n: next.round }) : t("rounds.open")}
-        icon="ti-hourglass"
-        value={!next || !e?.created ? "-" : b.round >= next.round ? t("countdown.reached") : formatDuration(at - b.nowMs)}
-        sub={next && e?.created ? formatTime(at, locale) : undefined}
-      />
+    <div className="card">
+      <div className="card-header">
+        <h2 className="header-title">
+          <button type="button" className="btn btn-link link-reset p-0 fs-16 fw-semibold text-decoration-none d-flex align-items-center gap-2" aria-expanded={open} aria-controls="how-body" onClick={() => setOpen(!open)}>
+            <Icon name="info-circle-bold-duotone" className="fs-22 text-primary" />
+            {t("home.howTitle")}
+            <i className={`ti ti-chevron-${open ? "up" : "down"}`} aria-hidden="true" />
+          </button>
+        </h2>
+      </div>
+      <div className="card-body pt-0" id="how-body" hidden={!open}>
+        <ol className="mb-0 ps-3 vstack gap-2">
+          <li>{t("home.how1")}</li>
+          <li>{t("home.how2")}</li>
+          <li>{t("home.how3")}</li>
+        </ol>
+      </div>
     </div>
+  );
+}
+
+function Loaded() {
+  const cfg = useConfig();
+  const p = usePhase();
+  return (
+    <>
+      <ErrorBox error={p.error} cfg={cfg} />
+      <div className="row">
+        <div className="col-xl-8">
+          <RoleCards p={p} />
+        </div>
+        <div className="col-xl-4">
+          <ExamTimeline />
+          <HowItWorks />
+        </div>
+      </div>
+      <ExamStatus />
+    </>
   );
 }
 
@@ -67,42 +178,16 @@ export default function Home() {
   const { t } = useI18n();
   const { config } = useApp();
   return (
-    <Page title={t("home.title")} needsConfig={false}>
-      {config?.status === "ok" ? <Stats /> : null}
-      <div className="card">
-        <div className="card-body">
-          <ol className="mb-0 ps-3 vstack gap-2">
-            <li>{t("home.line1")}</li>
-            <li>{t("home.line2")}</li>
-            <li>{t("home.line3")}</li>
-          </ol>
-        </div>
-      </div>
-      <ul className="row row-cols-1 row-cols-md-2 row-cols-xxl-4 list-unstyled mb-0">
-        {SCREENS.map((s) => (
-          <li key={s.href} className="col">
-            <div className="card card-h-100">
-              <div className="card-body">
-                <div className="d-flex align-items-center gap-2 mb-2">
-                  <span className="avatar-sm flex-shrink-0">
-                    <span className="avatar-title bg-primary-subtle text-primary rounded fs-18">
-                      <i className={`ti ${s.icon}`} aria-hidden="true" />
-                    </span>
-                  </span>
-                  <h2 className="header-title mb-0">
-                    <Link href={s.href} className="link-reset stretched-link">
-                      {t(s.title)}
-                    </Link>
-                  </h2>
-                </div>
-                <p className="text-muted mb-0">{t(s.body)}</p>
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {config?.status === "missing" ? <SetupMessage /> : null}
-      {config?.status === "invalid" ? <SetupMessage reason={config.message} /> : null}
+    <Page title={t("home.who")} intro={t("home.whoIntro")} needsConfig={false}>
+      {config?.status === "ok" ? (
+        <Loaded />
+      ) : (
+        <>
+          <RoleCards p={null} />
+          {config?.status === "missing" ? <SetupMessage /> : null}
+          {config?.status === "invalid" ? <SetupMessage reason={config.message} /> : null}
+        </>
+      )}
     </Page>
   );
 }

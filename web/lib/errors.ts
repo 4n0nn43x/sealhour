@@ -62,3 +62,22 @@ export function explainError(e: unknown, t: TFn, cfg?: AppConfig): string {
       return t("err.generic", { msg: shortMessage(e) });
   }
 }
+
+/** True for failures that go away by waiting: round not served yet (TooEarly), relay or network down. */
+export function isTransient(e: unknown): boolean {
+  const k = errorKind(e);
+  return k === "TooEarlyError" || k === "network";
+}
+
+/** Run fn until it succeeds or fails for good; transient failures are retried with a backoff of 1 s up to 15 s.
+ *  Stops (rethrowing the last failure) once alive() is false. */
+export async function retryTransient<T>(fn: () => Promise<T>, alive: () => boolean = () => true): Promise<T> {
+  for (let delay = 1000; ; delay = Math.min(delay * 2, 15000)) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (!isTransient(e) || !alive()) throw e;
+    }
+    await new Promise((r) => setTimeout(r, delay));
+  }
+}

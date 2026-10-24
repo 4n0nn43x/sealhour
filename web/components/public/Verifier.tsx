@@ -1,13 +1,15 @@
 "use client";
 // Dated leak verifier: who does a circulating text point to? Committee (before T), centre (fingerprint), or nobody.
+// The verdict itself shows in FlagPanel, next to the flag it justifies.
 import { useState } from "react";
 import { attributeLeak, renderForCentre, renderPlain, type LeakVerdict } from "@sealhour/seal";
 import { useConfig } from "../Providers";
 import { roundTimeMs, type BeaconState } from "@/lib/beacon";
+import type { DictKey } from "@/lib/dict";
 import { useI18n } from "@/lib/i18n";
 import { centreName, setLabel, type ExamSnapshot } from "@/lib/registry";
 import { useAction } from "@/lib/useAction";
-import { Button, ErrorBox, Field, Notice, Section } from "../ui";
+import { Button, ErrorBox, Field, Notice } from "../ui";
 import type { RevealData } from "./RevealPanel";
 
 /** datetime-local value (local time, minutes) for a timestamp. */
@@ -17,7 +19,7 @@ function toLocalInput(ms: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-export function Verifier({ snap, b, data, onLeak }: { snap: ExamSnapshot; b: BeaconState; data: RevealData | null; onLeak: (text: string, verdict: LeakVerdict) => void }) {
+export function Verifier({ snap, b, data, onLeak }: { snap: ExamSnapshot; b: BeaconState; data: RevealData | null; onLeak: (text: string, verdict: LeakVerdict | null) => void }) {
   const cfg = useConfig();
   const { t } = useI18n();
   const T = roundTimeMs(cfg, b.info, snap.exam.openRound);
@@ -70,44 +72,56 @@ export function Verifier({ snap, b, data, onLeak }: { snap: ExamSnapshot; b: Bea
     });
 
   return (
-    <Section title={t("verifier.title")} id="verifier">
-      <p>{t("verifier.body")}</p>
-      {!data ? <Notice tone="info">{t("verifier.needReveal")}</Notice> : null}
-      {presets.length ? (
-        <div className="d-flex flex-wrap align-items-center gap-2 mb-3" role="group" aria-label={t("verifier.presets")}>
-          {presets.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              className="btn btn-light btn-sm"
-              data-testid={`preset-${p.key}`}
-              onClick={() => {
-                setText(p.text);
-                setSeenAt(toLocalInput(p.at));
-                act.reset();
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
+    <section className="card" id="verifier" aria-labelledby="verifier-title">
+      <div className="card-header border-bottom border-dashed">
+        <h2 className="header-title" id="verifier-title">
+          {t("verifier.title")}
+        </h2>
+        <p className="text-muted mb-0 mt-1">{t("verifier.body")}</p>
+      </div>
+      <div className="card-body">
+        {presets.length ? (
+          <div className="d-flex flex-wrap align-items-center gap-2 mb-3" role="group" aria-label={t("verifier.presets")}>
+            <span className="text-muted me-1">{t("verifier.presets")}:</span>
+            {presets.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                className="btn btn-soft-primary btn-sm rounded-pill"
+                data-testid={`preset-${p.key}`}
+                onClick={() => {
+                  setText(p.text);
+                  setSeenAt(toLocalInput(p.at));
+                  act.reset();
+                  onLeak(p.text, null);
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <Field label={t("verifier.text")} htmlFor="leak">
+          <textarea id="leak" className="form-control" rows={6} value={text} onChange={(e) => (setText(e.target.value), onLeak(e.target.value, null))} />
+        </Field>
+        <Field label={t("verifier.seenAt")} htmlFor="seen-at" hint={t("verifier.seenHint")}>
+          <input id="seen-at" className="form-control w-auto" type="datetime-local" step={1} value={seenAt} onChange={(e) => (setSeenAt(e.target.value), onLeak(text, null))} />
+        </Field>
+        <Button onClick={() => void run()} busy={act.busy} disabled={!data || !text.trim()} testId="verify">
+          <i className="ti ti-search me-1" aria-hidden="true" />
+          {t("verifier.run")}
+        </Button>
+        {!data ? <p className="form-text mb-0">{t("verifier.needReveal")}</p> : !text.trim() ? <p className="form-text mb-0">{t("publicPage.verifyHint")}</p> : null}
+        <div className="mt-3">
+          <ErrorBox error={act.error} cfg={cfg} />
         </div>
-      ) : null}
-      <Field label={t("verifier.text")} htmlFor="leak">
-        <textarea id="leak" className="form-control" rows={8} value={text} onChange={(e) => setText(e.target.value)} />
-      </Field>
-      <Field label={t("verifier.seenAt")} htmlFor="seen-at" hint={t("verifier.seenHint")}>
-        <input id="seen-at" className="form-control w-auto" type="datetime-local" step={1} value={seenAt} onChange={(e) => setSeenAt(e.target.value)} />
-      </Field>
-      <Button onClick={() => void run()} busy={act.busy} disabled={!data || !text.trim()} testId="verify">
-        {t("verifier.run")}
-      </Button>
-      <ErrorBox error={act.error} cfg={cfg} />
-      {act.result ? <VerdictView v={act.result} snap={snap} /> : null}
-    </Section>
+      </div>
+    </section>
   );
 }
 
-function VerdictView({ v, snap }: { v: LeakVerdict; snap: ExamSnapshot }) {
+/** The verdict in plain words (testid verdict). */
+export function VerdictView({ v, snap }: { v: LeakVerdict; snap: ExamSnapshot }) {
   const cfg = useConfig();
   const { t } = useI18n();
   const score = v.score.toFixed(2);
@@ -127,7 +141,7 @@ function VerdictView({ v, snap }: { v: LeakVerdict; snap: ExamSnapshot }) {
   }
   return (
     <Notice tone={v.verdict === "no-match" ? "info" : "warn"} testId="verdict">
-      <strong>{t(`verifier.v.${v.verdict}`)}</strong> {msg}
+      <strong>{t(`verifier.v.${v.verdict}` as DictKey)}</strong> {msg}
     </Notice>
   );
 }

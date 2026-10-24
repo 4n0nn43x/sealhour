@@ -1,8 +1,7 @@
 "use client";
-// Beacon status line and the big countdown to a round.
+// Beacon status line (the phase stepper's details popover). The countdown is Countdown in blocks.tsx.
 import { PIN_MISMATCH, type BeaconState } from "@/lib/beacon";
-import { formatDuration, formatTime, useI18n } from "@/lib/i18n";
-import { roundTime } from "@sealhour/seal";
+import { useI18n } from "@/lib/i18n";
 
 export function BeaconBar({ b }: { b: BeaconState }) {
   const { t } = useI18n();
@@ -22,25 +21,5 @@ export function BeaconBar({ b }: { b: BeaconState }) {
         </span>
       ) : null}
     </p>
-  );
-}
-
-export function Countdown({ b, round, label }: { b: BeaconState; round: number; label: string }) {
-  const { t, locale } = useI18n();
-  const at = roundTime({ genesis_time: b.genesis, period: b.period } as Parameters<typeof roundTime>[0], round);
-  const left = at - b.nowMs;
-  const reached = b.round >= round;
-  return (
-    <div className="card text-center" data-testid="countdown">
-      <div className="card-body">
-        <div className="text-muted fs-13 text-uppercase fw-semibold">{label}</div>
-        <div className={reached ? "fs-1 fw-bold text-success my-2" : "display-3 fw-bold tabular my-2"} role="timer">
-          {reached ? t("countdown.reached") : formatDuration(left)}
-        </div>
-        <p className="mb-0 text-muted">
-          {t("countdown.round", { n: round })} {formatTime(at, locale)}
-        </p>
-      </div>
-    </div>
   );
 }

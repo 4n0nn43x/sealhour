@@ -23,9 +23,10 @@ export function Paper({
 }) {
   const { t } = useI18n();
   return (
-    <>
-      <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-        <button type="button" className="btn btn-primary" onClick={() => window.print()}>
+    <div className="vstack gap-3">
+      <div className="d-flex flex-wrap align-items-center gap-2">
+        <button type="button" className="btn btn-primary" onClick={() => window.print()} data-testid="print">
+          <i className="ti ti-printer me-1" aria-hidden="true" />
           {t("centre.print")}
         </button>
       </div>
@@ -41,6 +42,6 @@ export function Paper({
           {t("centre.fingerprint")} <code>{rendering.marks}</code> · {t("countdown.round", { n: round })} · {shortHex(sig, 8, 8)}
         </footer>
       </article>
-    </>
+    </div>
   );
 }

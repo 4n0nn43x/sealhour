@@ -1,61 +1,70 @@
 "use client";
-// After the reveal: anyone can flag a listed centre on chain, with the hash of the evidence.
+// The verdict card: what the checked text points to, and "Flag this centre" on chain with the hash of the text.
+// Public action: always signed by the local node's account (the public holds no key), never by a role's wallet.
 import { useEffect, useState } from "react";
 import { id as keccakText } from "ethers";
+import type { LeakVerdict } from "@sealhour/seal";
 import { useConfig } from "../Providers";
-import { useActor } from "@/lib/actor";
-import type { BeaconState } from "@/lib/beacon";
-import { nodeSigner, registry, sendTx, type TxResult } from "@/lib/chain";
+import { TxStep, VerifyDetails } from "../blocks";
+import { nodeSigner, registry, sendTx } from "@/lib/chain";
 import { useI18n } from "@/lib/i18n";
 import type { ExamSnapshot } from "@/lib/registry";
-import { useAction } from "@/lib/useAction";
-import { Button, ErrorBox, Hex, Notice, Section, TxOutcome } from "../ui";
+import { Hex } from "../ui";
+import { VerdictView } from "./Verifier";
 
-export function FlagPanel({ snap, b, evidence, suggested }: { snap: ExamSnapshot; b: BeaconState; evidence: string; suggested?: string }) {
+export function FlagPanel({ snap, revealed, leak }: { snap: ExamSnapshot; revealed: boolean; leak: { text: string; verdict: LeakVerdict | null } | null }) {
   const cfg = useConfig();
   const { t } = useI18n();
-  const { wallet } = useActor();
   const [centreId, setCentreId] = useState(snap.centres[0]?.centreId ?? "");
-  const tx = useAction<TxResult>();
-  const revealed = b.round >= snap.exam.revealRound;
-  const evidenceHash = keccakText(evidence || "no evidence");
+  const verdict = leak?.verdict ?? null;
+  const evidenceHash = keccakText(leak?.text || "no evidence");
 
   useEffect(() => {
-    if (suggested) setCentreId(suggested);
-  }, [suggested]);
+    if (verdict?.centreId) setCentreId(verdict.centreId);
+  }, [verdict?.centreId]);
 
-  const flag = () =>
-    tx.run(async () => {
-      const signer = wallet ?? (await nodeSigner(cfg));
-      const r = await sendTx(registry(cfg, signer), "flagCentre", [snap.examId, centreId, evidenceHash]);
-      return r;
-    });
-
+  const reason = !revealed ? t("publicPage.flagWaitReveal") : !verdict ? t("publicPage.flagNeedVerdict") : undefined;
   return (
-    <Section title={t("flag.title")} id="flag">
-      <p>{t("flag.body")}</p>
-      {!revealed ? <Notice tone="info">{t("flag.wait", { round: snap.exam.revealRound })}</Notice> : null}
-      <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
-        <label className="d-inline-flex align-items-center gap-2 mb-0">
-          {t("flag.centre")}
-          <select className="form-select w-auto" value={centreId} onChange={(e) => setCentreId(e.target.value)}>
-            {snap.centres.map((c) => (
-              <option key={c.centreId} value={c.centreId}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <span className="text-muted">
-          {t("flag.evidence")} <Hex value={evidenceHash} />
-        </span>
+    <section className="card" id="flag" aria-labelledby="flag-title">
+      <div className="card-header border-bottom border-dashed">
+        <h2 className="header-title" id="flag-title">
+          {t("publicPage.verdictTitle")}
+        </h2>
       </div>
-      <Button variant="danger" onClick={() => void flag()} busy={tx.busy} disabled={!centreId} testId="flag">
-        {t("flag.button")}
-      </Button>
-      {!wallet ? <p className="form-text">{t("flag.jurorSigner")}</p> : null}
-      <ErrorBox error={tx.error} cfg={cfg} />
-      <TxOutcome tx={tx.result} />
-    </Section>
+      <div className="card-body">
+        {verdict ? <VerdictView v={verdict} snap={snap} /> : <p className="text-muted">{t("publicPage.noVerdict")}</p>}
+        <div className="border-top border-dashed pt-3">
+          <h3 className="fs-15 fw-semibold mb-1">{t("flag.title")}</h3>
+          <p className="text-muted mb-3">{t("flag.body")}</p>
+          <TxStep
+            label={t("flag.button")}
+            variant="danger"
+            testId="flag"
+            disabled={Boolean(reason) || !centreId}
+            disabledReason={reason}
+            run={async () => sendTx(registry(cfg, await nodeSigner(cfg)), "flagCentre", [snap.examId, centreId, evidenceHash])}
+          >
+            <div className="mb-3" style={{ maxWidth: 320 }}>
+              <label className="form-label" htmlFor="flag-centre">
+                {t("flag.centre")}
+              </label>
+              <select id="flag-centre" className="form-select" value={centreId} onChange={(e) => setCentreId(e.target.value)}>
+                {snap.centres.map((c) => (
+                  <option key={c.centreId} value={c.centreId}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </TxStep>
+          <VerifyDetails>
+            <p className="mb-2">
+              {t("flag.evidence")} <Hex value={evidenceHash} head={10} tail={8} />
+            </p>
+            <p className="mb-0">{t("flag.jurorSigner")}</p>
+          </VerifyDetails>
+        </div>
+      </div>
+    </section>
   );
 }
