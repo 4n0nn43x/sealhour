@@ -116,8 +116,8 @@ demo:
 	echo
 	echo "SealHour demo is up (logs: shared/hardhat-node.log, shared/beacon.log, shared/web.log)"
 	echo "  Home        $$base/"
-	echo "  Enrolment   $$base/enrolement/   (exam office: centres, frozen list, phantom centre refused)"
-	echo "  Committee   $$base/comite/       (committees A to D and R: seal in the browser, burn a set)"
+	echo "  Enrolment   $$base/enrolment/    (exam office: centres, frozen list, phantom centre refused)"
+	echo "  Committee   $$base/committee/    (committees A to D and R: seal in the browser, burn a set)"
 	echo "  Centre      $$base/centre/       (centre heads: key check, signature, offline opening, print)"
 	echo "  Public      $$base/public/       (anyone, juror: no key before T, reveal, leak verifier)"
 	echo "  Chain RPC   http://127.0.0.1:$(RPC_PORT)   Beacon relay http://127.0.0.1:$(BEACON_PORT)"

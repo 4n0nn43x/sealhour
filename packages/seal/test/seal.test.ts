@@ -118,9 +118,9 @@ describe("double lock tlock(age)", () => {
   it("opens a public tlocked text only after its round", async () => {
     const b = testBeacon();
     const round = b.currentRound() + 1;
-    const ct = await tlockText("Jeu A, version publique", round, b.client());
+    const ct = await tlockText("Set A, public version", round, b.client());
     await expect(openText({ tlocked: ct, client: b.client() })).rejects.toBeInstanceOf(TooEarlyError);
     await waitForRound(b, round);
-    expect(await openText({ tlocked: ct, client: b.client() })).toBe("Jeu A, version publique");
+    expect(await openText({ tlocked: ct, client: b.client() })).toBe("Set A, public version");
   });
 });

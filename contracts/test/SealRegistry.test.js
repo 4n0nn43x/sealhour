@@ -7,7 +7,7 @@ const id = (s) => ethers.id(s); // keccak256 of a label, used as bytes32
 const listRoot = (ids) => ethers.solidityPackedKeccak256(["bytes32[]"], [ids]);
 
 const EXAM = id("exam:maths-2026");
-const CENTRES = ["Cotonou", "Parakou", "Porto-Novo", "Natitingou"];
+const CENTRES = ["Northgate", "Riverside", "Eastport", "Hillcrest"];
 const CENTRE_IDS = CENTRES.map((n) => id(`centre:${n}`));
 const KEYS = CENTRES.map((n) => id(`x25519:${n}`));
 // Beacon pin stored by the constructor (any non zero hash, any non empty key).
@@ -131,20 +131,20 @@ describe("SealRegistry", function () {
   describe("registerCentre", function () {
     it("registers a centre and emits CentreRegistered", async function () {
       const { registry, operators } = await load(deployFixture);
-      await expect(registry.registerCentre(CENTRE_IDS[0], KEYS[0], operators[0].address, "Cotonou"))
+      await expect(registry.registerCentre(CENTRE_IDS[0], KEYS[0], operators[0].address, "Northgate"))
         .to.emit(registry, "CentreRegistered")
-        .withArgs(CENTRE_IDS[0], KEYS[0], operators[0].address, "Cotonou");
+        .withArgs(CENTRE_IDS[0], KEYS[0], operators[0].address, "Northgate");
       const c = await registry.getCentre(CENTRE_IDS[0]);
       expect(c.pubKey).to.equal(KEYS[0]);
       expect(c.operator).to.equal(operators[0].address);
-      expect(c.name).to.equal("Cotonou");
+      expect(c.name).to.equal("Northgate");
       expect(c.frozen).to.equal(false);
     });
 
     it("allows updating a key while not frozen", async function () {
       const { registry, operators } = await load(registeredFixture);
-      const newKey = id("x25519:Cotonou:v2");
-      await registry.registerCentre(CENTRE_IDS[0], newKey, operators[1].address, "Cotonou 2");
+      const newKey = id("x25519:Northgate:v2");
+      await registry.registerCentre(CENTRE_IDS[0], newKey, operators[1].address, "Northgate 2");
       const c = await registry.getCentre(CENTRE_IDS[0]);
       expect(c.pubKey).to.equal(newKey);
       expect(c.operator).to.equal(operators[1].address);
@@ -160,10 +160,10 @@ describe("SealRegistry", function () {
     it("reverts BadList on a zero key or a zero operator", async function () {
       const { registry, operators } = await load(deployFixture);
       await expect(
-        registry.registerCentre(CENTRE_IDS[0], ethers.ZeroHash, operators[0].address, "Cotonou")
+        registry.registerCentre(CENTRE_IDS[0], ethers.ZeroHash, operators[0].address, "Northgate")
       ).to.be.revertedWithCustomError(registry, "BadList");
       await expect(
-        registry.registerCentre(CENTRE_IDS[0], KEYS[0], ethers.ZeroAddress, "Cotonou")
+        registry.registerCentre(CENTRE_IDS[0], KEYS[0], ethers.ZeroAddress, "Northgate")
       ).to.be.revertedWithCustomError(registry, "BadList");
       expect((await registry.getCentre(CENTRE_IDS[0])).pubKey).to.equal(ethers.ZeroHash);
     });
@@ -173,7 +173,7 @@ describe("SealRegistry", function () {
       const c = await registry.getCentre(CENTRE_IDS[2]);
       expect(c.frozen).to.equal(true);
       await expect(
-        registry.registerCentre(CENTRE_IDS[2], id("other key"), operators[2].address, "Porto-Novo")
+        registry.registerCentre(CENTRE_IDS[2], id("other key"), operators[2].address, "Eastport")
       ).to.be.revertedWithCustomError(registry, "KeyFrozen");
     });
 

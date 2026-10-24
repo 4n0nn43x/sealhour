@@ -113,7 +113,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(port, "127.0.0.1", () => {
   console.log(
-    `Relais beacon local sur http://127.0.0.1:${port} (chaîne ${info.hash.slice(0, 16)}..., période ${info.period} s, genesis ${info.genesis_time}${created ? ", nouvelle clé" : ", clé existante"})`,
+    `Local beacon relay on http://127.0.0.1:${port} (chain ${info.hash.slice(0, 16)}..., period ${info.period} s, genesis ${info.genesis_time}${created ? ", new key" : ", existing key"})`,
   );
 });
 

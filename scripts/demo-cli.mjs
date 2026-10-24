@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // End to end replay of the SealHour final demo (docs/smu/32, section 9) against the running Hardhat
-// node and local beacon relay, after seed-demo.mjs. Prints numbered steps in French with OK or FAIL;
+// node and local beacon relay, after seed-demo.mjs. Prints numbered steps with OK or FAIL;
 // exits 1 if any check fails.
 // Usage: node demo-cli.mjs
 import fs from "node:fs";
@@ -36,7 +36,7 @@ import { FILES, SHARED_DIR, ensureWallClockMining, loadDeployment, readBeaconPin
 
 silenceTlockLogs();
 
-const COPIES_PER_CENTRE = 580; // average BEPC centre (docs/smu/32, section 3)
+const COPIES_PER_CENTRE = 580; // average exam centre (docs/smu/32, section 3)
 let stepNo = 0;
 let failures = 0;
 let checks = 0;
@@ -53,11 +53,11 @@ async function check(label, fn) {
   checks++;
   try {
     const detail = await fn();
-    console.log(`   OK    ${label}${detail ? ` : ${detail}` : ""}`);
+    console.log(`   OK    ${label}${detail ? `: ${detail}` : ""}`);
     return true;
   } catch (e) {
     failures++;
-    console.log(`   FAIL  ${label} : ${e?.shortMessage ?? e?.message ?? e}`);
+    console.log(`   FAIL  ${label}: ${e?.shortMessage ?? e?.message ?? e}`);
     return false;
   }
 }
@@ -69,10 +69,10 @@ async function expectError(promiseFn, ErrorClass) {
   try {
     await promiseFn();
   } catch (e) {
-    if (e instanceof ErrorClass) return `refusé (${ErrorClass.name})`;
-    throw new Error(`attendu ${ErrorClass.name}, obtenu ${e?.name ?? "erreur"} : ${e?.message ?? e}`);
+    if (e instanceof ErrorClass) return `refused (${ErrorClass.name})`;
+    throw new Error(`expected ${ErrorClass.name}, got ${e?.name ?? "error"}: ${e?.message ?? e}`);
   }
-  throw new Error(`attendu ${ErrorClass.name}, mais l'ouverture a réussi`);
+  throw new Error(`expected ${ErrorClass.name}, but opening succeeded`);
 }
 /** The transaction must be refused by the contract with the given custom error. */
 async function expectRevert(sendFn, iface, errorName) {
@@ -81,10 +81,10 @@ async function expectRevert(sendFn, iface, errorName) {
     await tx.wait();
   } catch (e) {
     const name = revertName(e, iface);
-    if (name === errorName) return `transaction refusée par le contrat (${errorName})`;
-    throw new Error(`attendu le revert ${errorName}, obtenu ${name ?? e?.shortMessage ?? e?.message ?? e}`);
+    if (name === errorName) return `transaction refused by the contract (${errorName})`;
+    throw new Error(`expected revert ${errorName}, got ${name ?? e?.shortMessage ?? e?.message ?? e}`);
   }
-  throw new Error(`attendu le revert ${errorName}, mais la transaction est passée`);
+  throw new Error(`expected revert ${errorName}, but the transaction went through`);
 }
 
 async function main() {
@@ -105,9 +105,9 @@ async function main() {
   const T = roundTime(beaconInfo, rounds.open);
   const revealT = roundTime(beaconInfo, rounds.reveal);
   const byName = Object.fromEntries(state.centres.map((c) => [c.name, c]));
-  const cotonou = byName["Cotonou"];
-  const parakou = byName["Parakou"];
-  const natitingou = byName["Natitingou"];
+  const northgate = byName["Northgate"];
+  const riverside = byName["Riverside"];
+  const hillcrest = byName["Hillcrest"];
   const committeeC = state.committees.find((k) => k.label === "C");
   const committeeD = state.committees.find((k) => k.label === "D");
   const exam = await registry.getExam(examId);
@@ -116,204 +116,204 @@ async function main() {
 
   /** Fetch the package file of a centre for a set via its on chain URI, and check it against the on chain root. */
   async function fetchPackage(setIndex, centreId) {
-    assert(Number.isInteger(setIndex), "aucun jeu tiré (étape précédente en échec)");
+    assert(Number.isInteger(setIndex), "no set drawn (previous step failed)");
     const [root, uri] = await registry.packageOf(examId, setIndex);
     const indexFile = path.join(SHARED_DIR, uri);
     const index = readJson(indexFile);
     const pos = index.items.findIndex((it) => it.centreId === centreId);
-    assert(pos >= 0, `centre absent du paquet ${index.label}`);
+    assert(pos >= 0, `centre missing from package ${index.label}`);
     const ciphertext = fs.readFileSync(path.join(path.dirname(indexFile), index.items[pos].file), "utf8");
     const leaves = index.items.map((it) => it.leaf);
     const digest = ethers.sha256(ethers.toUtf8Bytes(ciphertext));
     const leaf = ethers.keccak256(ethers.solidityPacked(["bytes32", "bytes32"], [centreId, digest]));
-    assert(leaf === leaves[pos], "le fichier ne correspond pas à sa feuille");
-    assert(verifyProof(leaf, merkleProof(leaves, pos), root), "preuve de Merkle invalide contre la racine sur la chaîne");
+    assert(leaf === leaves[pos], "file does not match its leaf");
+    assert(verifyProof(leaf, merkleProof(leaves, pos), root), "invalid Merkle proof against the on-chain root");
     return { ciphertext, index, dir: path.dirname(indexFile) };
   }
 
-  console.log(`SealHour, démo de bout en bout : ${state.examTitle}`);
-  console.log(`Contrat ${state.contract} sur ${state.rpcUrl}, relais beacon ${state.beaconUrl}`);
-  console.log(`Rounds : ouverture ${rounds.open}, révélation ${rounds.reveal}, réserve ${rounds.reserveOpen} puis ${rounds.reserveReveal}`);
-  console.log(`Ouverture (T) dans ${Math.round((T - Date.now()) / 1000)} s`);
+  console.log(`SealHour, end to end demo: ${state.examTitle}`);
+  console.log(`Contract ${state.contract} on ${state.rpcUrl}, beacon relay ${state.beaconUrl}`);
+  console.log(`Rounds: open ${rounds.open}, reveal ${rounds.reveal}, reserve ${rounds.reserveOpen} then ${rounds.reserveReveal}`);
+  console.log(`Opening (T) in ${Math.round((T - Date.now()) / 1000)} s`);
 
   // a. Before T
-  step("Avant T : un juré télécharge le paquet de Cotonou (jeu A) et tente de l'ouvrir");
+  step("Before T: a juror downloads the Northgate package (set A) and tries to open it");
   const jury = await generateCentreKey(); // the jury's own key, not a centre key
-  let cotonouA;
-  await check("paquet récupéré, intégrité vérifiée contre la racine de Merkle publiée sur la chaîne", async () => {
-    cotonouA = await fetchPackage(0, cotonou.centreId);
-    return `${cotonouA.ciphertext.length} octets`;
+  let northgateA;
+  await check("package fetched, integrity checked against the Merkle root published on chain", async () => {
+    northgateA = await fetchPackage(0, northgate.centreId);
+    return `${northgateA.ciphertext.length} bytes`;
   });
-  await check("le relais refuse de servir la signature du round d'ouverture", async () => {
+  await check("the relay refuses to serve the opening round signature", async () => {
     const res = await fetch(`${state.beaconUrl}/public/${rounds.open}`);
-    assert(res.status === 425, `HTTP ${res.status} au lieu de 425`);
-    return `HTTP 425, aucune clé n'existe avant T`;
+    assert(res.status === 425, `HTTP ${res.status} instead of 425`);
+    return `HTTP 425, no key exists before T`;
   });
-  await check("le juré (sans clé de centre) ne peut pas ouvrir", () =>
-    expectError(() => openForCentre({ ciphertext: cotonouA.ciphertext, identity: jury.identity, client: relay }), TooEarlyError),
+  await check("the juror (no centre key) cannot open", () =>
+    expectError(() => openForCentre({ ciphertext: northgateA.ciphertext, identity: jury.identity, client: relay }), TooEarlyError),
   );
-  await check("Cotonou, avec sa propre clé, ne peut pas ouvrir non plus avant T", () =>
-    expectError(() => openForCentre({ ciphertext: cotonouA.ciphertext, identity: cotonou.identity, client: relay }), TooEarlyError),
+  await check("Northgate, with its own key, cannot open before T either", () =>
+    expectError(() => openForCentre({ ciphertext: northgateA.ciphertext, identity: northgate.identity, client: relay }), TooEarlyError),
   );
 
   // b. Phantom centre
-  step(`L'office tente d'ajouter un cinquième centre (« ${state.phantom.name} ») à la liste gelée`);
+  step(`The office tries to add a fifth centre ("${state.phantom.name}") to the frozen list`);
   const listed = await registry.examCentres(examId);
-  await check("nouveau gel de la liste avec 5 centres", () => {
+  await check("freezing the list again with 5 centres", () => {
     const ids = [...listed, state.phantom.centreId];
     const root = ethers.keccak256(ethers.solidityPacked(["bytes32[]"], [ids]));
     return expectRevert(() => registry.freezeCentres(examId, ids, root, ids.length), iface, "AlreadyDone");
   });
-  await check("remplacement de la clé de Cotonou par celle du centre fantôme", async () => {
+  await check("replacing the Northgate key with the phantom centre's key", async () => {
     const ghost = await generateCentreKey();
-    return expectRevert(() => registry.registerCentre(cotonou.centreId, recipientToBytes32(ghost.recipient), state.office.address, state.phantom.name), iface, "KeyFrozen");
+    return expectRevert(() => registry.registerCentre(northgate.centreId, recipientToBytes32(ghost.recipient), state.office.address, state.phantom.name), iface, "KeyFrozen");
   });
-  await check("inscription du centre fantôme à l'examen", () =>
+  await check("enrolling the phantom centre in the exam", () =>
     expectRevert(() => registry.joinExam(examId, state.phantom.centreId, ethers.ZeroHash, "0x"), iface, "NotCentre"),
   );
-  await check("la liste publique compte toujours le nombre de centres annoncé", async () => {
+  await check("the public list still has the announced number of centres", async () => {
     const now = await registry.examCentres(examId);
-    assert(now.length === state.announcedCentreCount, `${now.length} centres, ${state.announcedCentreCount} annoncés`);
-    return `${now.length} centres : ${state.centres.map((c) => c.name).join(", ")}`;
+    assert(now.length === state.announcedCentreCount, `${now.length} centres, ${state.announcedCentreCount} announced`);
+    return `${now.length} centres: ${state.centres.map((c) => c.name).join(", ")}`;
   });
 
   // c. Burn
-  step("Le comité C a vu son jeu circuler sur Telegram la veille : il le brûle avant T");
-  await check("le comité D tente de brûler le jeu C", () => expectRevert(() => as(committeeD.privateKey).burnSet(examId, 2), iface, "NotCommittee"));
-  await check("le comité C brûle son jeu sur la chaîne", async () => {
+  step("Committee C saw its set circulating on Telegram the day before: it burns it before T");
+  await check("committee D tries to burn set C", () => expectRevert(() => as(committeeD.privateKey).burnSet(examId, 2), iface, "NotCommittee"));
+  await check("committee C burns its set on chain", async () => {
     const rc = await (await as(committeeC.privateKey).burnSet(examId, 2)).wait();
     const ev = rc.logs.map((l) => iface.parseLog(l)).find((l) => l?.name === "SetBurned");
-    assert(ev, "pas d'événement SetBurned");
-    assert(await registry.isBurned(examId, 2), "isBurned(C) est faux");
-    return `bloc ${rc.blockNumber}, événement SetBurned`;
+    assert(ev, "no SetBurned event");
+    assert(await registry.isBurned(examId, 2), "isBurned(C) is false");
+    return `block ${rc.blockNumber}, SetBurned event`;
   });
 
   // d. Wait for T
-  step(`Attente du round d'ouverture ${rounds.open}`);
-  await waitRound(rounds.open, "ouverture");
-  await check("round d'ouverture atteint sur le beacon et sur la chaîne", async () => `round chaîne ${await registry.currentRound()}`);
+  step(`Waiting for opening round ${rounds.open}`);
+  await waitRound(rounds.open, "opening");
+  await check("opening round reached on the beacon and on chain", async () => `chain round ${await registry.currentRound()}`);
 
   // e. Signature from the relay
-  step("Le round tombe : signature récupérée sur le relais, vérifiée localement");
+  step("The round falls: signature fetched from the relay, verified locally");
   let sig;
-  await check("signature du round d'ouverture valide pour la clé publique du beacon", async () => {
+  await check("opening round signature valid for the beacon public key", async () => {
     const res = await fetch(`${state.beaconUrl}/public/${rounds.open}`);
     assert(res.ok, `HTTP ${res.status}`);
     const b = await res.json();
     assert(b.round === rounds.open, `round ${b.round}`);
-    assert(verifyBeaconSignature(beaconInfo, rounds.open, b.signature), "signature invalide");
+    assert(verifyBeaconSignature(beaconInfo, rounds.open, b.signature), "invalid signature");
     sig = b.signature;
-    return `${sig.slice(0, 24)}... (48 octets)`;
+    return `${sig.slice(0, 24)}... (48 bytes)`;
   });
-  await check("une signature altérée est rejetée", async () => {
+  await check("a tampered signature is rejected", async () => {
     const bad = (sig[0] === "a" ? "b" : "a") + sig.slice(1);
-    assert(!verifyBeaconSignature(beaconInfo, rounds.open, bad), "signature altérée acceptée");
-    return "rejetée";
+    assert(!verifyBeaconSignature(beaconInfo, rounds.open, bad), "tampered signature accepted");
+    return "rejected";
   });
-  await check("téléphone du juré : « signature valide, vous n'êtes pas un centre »", () =>
-    expectError(() => openForCentre({ ciphertext: cotonouA.ciphertext, identity: jury.identity, client: relay }), WrongKeyError),
+  await check('juror\'s phone: "valid signature, you are not a centre"', () =>
+    expectError(() => openForCentre({ ciphertext: northgateA.ciphertext, identity: jury.identity, client: relay }), WrongKeyError),
   );
 
-  // f. Natitingou offline
-  step("Natitingou, hors ligne, reçoit la signature par SMS et ouvre son paquet");
+  // f. Hillcrest offline
+  step("Hillcrest, offline, receives the signature by SMS and opens its package");
   let drawn;
-  let natSet;
+  let hillSet;
   let sms;
-  await check("signature encodée en base32 Crockford (avec contrôle) pour le SMS", async () => {
+  await check("signature encoded in Crockford base32 (with check) for the SMS", async () => {
     sms = encodeSignature(sig);
-    return `${sms.length} caractères`;
+    return `${sms.length} characters`;
   });
-  if (sms) info(`SMS : ${sms}`);
+  if (sms) info(`SMS: ${sms}`);
   let offline;
-  await check("le chef de centre retape le code (minuscules, espaces) : décodé et vérifié hors ligne", async () => {
+  await check("the centre head retypes the code (lowercase, spaces): decoded and verified offline", async () => {
     const typed = sms.toLowerCase().replace(/-/g, " ");
     const decoded = decodeSignature(typed);
-    assert(decoded.replace(/^0x/, "") === sig.replace(/^0x/, ""), "signature décodée différente");
+    assert(decoded.replace(/^0x/, "") === sig.replace(/^0x/, ""), "decoded signature differs");
     offline = offlineClient(beaconInfo, rounds.open, decoded);
-    return "offlineClient prêt, aucun réseau requis";
+    return "offlineClient ready, no network needed";
   });
-  await check("un code SMS corrompu est refusé", async () => {
+  await check("a corrupted SMS code is refused", async () => {
     const corrupted = (sms[0] === "0" ? "1" : "0") + sms.slice(1);
     try {
       offlineClient(beaconInfo, rounds.open, decodeSignature(corrupted));
     } catch (e) {
-      return `refusé (${e instanceof BadSignatureError ? "BadSignatureError" : "contrôle base32"})`;
+      return `refused (${e instanceof BadSignatureError ? "BadSignatureError" : "base32 check"})`;
     }
-    throw new Error("code corrompu accepté");
+    throw new Error("corrupted code accepted");
   });
-  await check("tirage du jeu parmi les jeux non brûlés (C brûlé)", async () => {
+  await check("drawing the set among the unburned sets (C burned)", async () => {
     const burned = [];
     for (let i = 0; i < setCount; i++) if (await registry.isBurned(examId, i)) burned.push(i);
-    assert(burned.length === 1 && burned[0] === 2, `jeux brûlés sur la chaîne : [${burned}]`);
+    assert(burned.length === 1 && burned[0] === 2, `sets burned on chain: [${burned}]`);
     const submitted = [];
     for (let i = 0; i < setCount; i++) if ((await registry.packageOf(examId, i))[0] !== ethers.ZeroHash) submitted.push(i);
     drawn = drawSet(sig, setCount, burned, submitted);
-    assert(drawn !== 2, "le jeu brûlé C a été tiré");
-    return `jeux brûlés [${burned.map(labelOf)}], jeu tiré : ${labelOf(drawn)}`;
+    assert(drawn !== 2, "burned set C was drawn");
+    return `burned sets [${burned.map(labelOf)}], drawn set: ${labelOf(drawn)}`;
   });
-  let natRender;
-  await check(`Natitingou ouvre le jeu tiré avec sa clé`, async () => {
-    const pkg = await fetchPackage(drawn, natitingou.centreId);
-    const plain = await openForCentre({ ciphertext: pkg.ciphertext, identity: natitingou.identity, client: offline });
-    natSet = parseExamSet(new TextDecoder().decode(plain));
-    assert(natSet.setLabel === `Jeu ${labelOf(drawn)}`, `jeu ouvert ${natSet.setLabel}`);
-    natRender = renderForCentre(natSet, natitingou.centreId, natitingou.rcHex, sig);
-    return `${natSet.setLabel}, ${natSet.questions.length} questions`;
+  let hillRender;
+  await check(`Hillcrest opens the drawn set with its key`, async () => {
+    const pkg = await fetchPackage(drawn, hillcrest.centreId);
+    const plain = await openForCentre({ ciphertext: pkg.ciphertext, identity: hillcrest.identity, client: offline });
+    hillSet = parseExamSet(new TextDecoder().decode(plain));
+    assert(hillSet.setLabel === `Set ${labelOf(drawn)}`, `opened set ${hillSet.setLabel}`);
+    hillRender = renderForCentre(hillSet, hillcrest.centreId, hillcrest.rcHex, sig);
+    return `${hillSet.setLabel}, ${hillSet.questions.length} questions`;
   });
-  if (natRender) {
+  if (hillRender) {
     // The first 3 lines are the header; show them and the first printed question with its options.
-    const lines = natRender.text.split("\n");
+    const lines = hillRender.text.split("\n");
     const firstQuestionEnd = lines.findIndex((l, i) => i > 3 && /^\d+\. /.test(l));
-    info("Rendu à empreinte de Natitingou (en-tête et première question imprimée) :");
+    info("Hillcrest fingerprinted rendering (header and first printed question):");
     for (const line of lines.slice(0, firstQuestionEnd > 0 ? firstQuestionEnd : 3)) info(`  | ${line}`);
-    info(`  | ... ordre des questions [${natRender.order.map((q) => q + 1).join(", ")}], marques ${natRender.marks.slice(0, 23)}...`);
+    info(`  | ... question order [${hillRender.order.map((q) => q + 1).join(", ")}], marks ${hillRender.marks.slice(0, 23)}...`);
   }
-  await check(`exemplaires du procès-verbal désignés par la signature (sur ${COPIES_PER_CENTRE})`, async () => {
+  await check(`record copies designated by the signature (out of ${COPIES_PER_CENTRE})`, async () => {
     const idx = recordCopyIndexes(sig, COPIES_PER_CENTRE);
-    assert(idx.length === 3, `${idx.length} exemplaires`);
-    return `exemplaires n° ${idx.join(", ")} de la pile imprimée`;
+    assert(idx.length === 3, `${idx.length} copies`);
+    return `copies no. ${idx.join(", ")} of the printed stack`;
   });
 
   // g. Every centre
-  step("Chaque centre ouvre sa copie du jeu tiré (relais en ligne)");
+  step("Each centre opens its copy of the drawn set (online relay)");
   const renders = new Map();
   for (const c of state.centres) {
     await check(`${c.name}`, async () => {
       const pkg = await fetchPackage(drawn, c.centreId);
       const set = parseExamSet(new TextDecoder().decode(await openForCentre({ ciphertext: pkg.ciphertext, identity: c.identity, client: relay })));
-      assert(serializeExamSet(set) === serializeExamSet(readJson(path.join(FILES.setsDir, `set-${drawn}.json`))), "contenu différent du brouillon du comité");
+      assert(serializeExamSet(set) === serializeExamSet(readJson(path.join(FILES.setsDir, `set-${drawn}.json`))), "content differs from the committee draft");
       const r = renderForCentre(set, c.centreId, c.rcHex, sig);
       renders.set(c.centreId, r.text);
-      return `${set.setLabel} ouvert, empreinte ${r.marks.slice(0, 11)}...`;
+      return `${set.setLabel} opened, fingerprint ${r.marks.slice(0, 11)}...`;
     });
   }
-  await check("les quatre rendus imprimés sont tous différents (empreinte par centre)", async () => {
-    assert(new Set(renders.values()).size === state.centres.length, "deux centres ont le même rendu");
-    return "4 rendus distincts";
+  await check("the four printed renderings all differ (per centre fingerprint)", async () => {
+    assert(new Set(renders.values()).size === state.centres.length, "two centres have the same rendering");
+    return "4 distinct renderings";
   });
-  await check("le jeu de réserve R reste fermé jusqu'à son propre round", async () => {
-    const pkg = await fetchPackage(setCount, cotonou.centreId);
-    return expectError(() => openForCentre({ ciphertext: pkg.ciphertext, identity: cotonou.identity, client: relay }), TooEarlyError);
+  await check("reserve set R stays closed until its own round", async () => {
+    const pkg = await fetchPackage(setCount, northgate.centreId);
+    return expectError(() => openForCentre({ ciphertext: pkg.ciphertext, identity: northgate.identity, client: relay }), TooEarlyError);
   });
 
   // h. Reveal
-  step(`Attente du round de révélation ${rounds.reveal}`);
-  await waitRound(rounds.reveal, "révélation");
-  step("Après la révélation : les jeux et tous les r_c s'ouvrent publiquement");
+  step(`Waiting for reveal round ${rounds.reveal}`);
+  await waitRound(rounds.reveal, "reveal");
+  step("After the reveal: the sets and every r_c open publicly");
   const publicSets = [];
   for (let i = 0; i < setCount; i++) {
-    await check(`copie publique du jeu ${labelOf(i)}`, async () => {
+    await check(`public copy of set ${labelOf(i)}`, async () => {
       const [, uri] = await registry.packageOf(examId, i);
       const dir = path.dirname(path.join(SHARED_DIR, uri));
       const index = readJson(path.join(SHARED_DIR, uri));
       const text = await openText({ tlocked: fs.readFileSync(path.join(dir, index.publicCopy), "utf8"), client: relay });
       const set = parseExamSet(text);
-      assert(serializeExamSet(set) === serializeExamSet(readJson(path.join(FILES.setsDir, `set-${i}.json`))), "copie publique différente du jeu scellé");
+      assert(serializeExamSet(set) === serializeExamSet(readJson(path.join(FILES.setsDir, `set-${i}.json`))), "public copy differs from the sealed set");
       publicSets.push({ setIndex: i, set });
-      return `${set.setLabel} lisible par tous${i === 2 ? " (jeu brûlé)" : ""}${i === drawn ? " (jeu tiré)" : ""}`;
+      return `${set.setLabel} readable by anyone${i === 2 ? " (burned set)" : ""}${i === drawn ? " (drawn set)" : ""}`;
     });
   }
-  await check("la copie publique du jeu de réserve R attend sa propre révélation", async () => {
+  await check("the public copy of reserve set R waits for its own reveal", async () => {
     const [, uri] = await registry.packageOf(examId, setCount);
     const index = readJson(path.join(SHARED_DIR, uri));
     const tlocked = fs.readFileSync(path.join(SHARED_DIR, path.dirname(uri), index.publicCopy), "utf8");
@@ -321,58 +321,58 @@ async function main() {
   });
   const revealedRc = [];
   for (const c of state.centres) {
-    await check(`r_c de ${c.name} ouvert depuis la chaîne, conforme à son engagement`, async () => {
+    await check(`r_c of ${c.name} opened from the chain, matches its commitment`, async () => {
       const part = await registry.participation(examId, c.centreId);
       const rc = await openRc({ tlocked: ethers.toUtf8String(part.tlockedRc), client: relay });
-      assert(commitRc(rc) === part.rcCommit, "H(r_c) différent de l'engagement publié");
-      assert(rc === c.rcHex, "r_c différent de celui du centre");
+      assert(commitRc(rc) === part.rcCommit, "H(r_c) differs from the published commitment");
+      assert(rc === c.rcHex, "r_c differs from the centre's");
       revealedRc.push({ centreId: c.centreId, rcHex: rc });
       return `${rc.slice(0, 18)}...`;
     });
   }
 
   // i. Verifier, with public data only (public copies, r_c opened from the chain, the signature)
-  step("Vérificateur daté (données publiques uniquement)");
+  step("Dated verifier (public data only)");
   const base = { openRoundTimeMs: T, revealRoundTimeMs: revealT, sets: publicSets, drawnSet: drawn, signatureHex: sig, centres: revealedRc };
   // Seen between T and the reveal round: after reveal every rendering is computable by anyone.
   const inCentreWindow = T + Math.floor((revealT - T) / 2);
   const nameOf = (id) => state.centres.find((c) => c.centreId === id)?.name ?? id;
-  const photo = renders.get(parakou.centreId);
-  await check("photo d'une copie de Parakou (centre 2) vue après T, avant la révélation", async () => {
+  const photo = renders.get(riverside.centreId);
+  await check("photo of a Riverside copy (centre 2) seen after T, before the reveal", async () => {
     const v = attributeLeak({ ...base, leakedText: photo, seenAtMs: inCentreWindow });
-    assert(v.verdict === "centre" && v.centreId === parakou.centreId, `verdict ${v.verdict} ${v.centreId ? nameOf(v.centreId) : ""}`);
-    return `verdict « centre » : ${nameOf(v.centreId)} (score ${v.score.toFixed(2)})`;
+    assert(v.verdict === "centre" && v.centreId === riverside.centreId, `verdict ${v.verdict} ${v.centreId ? nameOf(v.centreId) : ""}`);
+    return `verdict "centre": ${nameOf(v.centreId)} (score ${v.score.toFixed(2)})`;
   });
-  await check("texte du jeu C vu sur Telegram la veille (avant T)", async () => {
+  await check("text of set C seen on Telegram the day before (before T)", async () => {
     const leak = renderPlain(publicSets.find((s) => s.setIndex === 2).set);
     const v = attributeLeak({ ...base, leakedText: leak, seenAtMs: T - 24 * 3600_000 });
     assert(v.verdict === "committee" && v.setIndex === 2, `verdict ${v.verdict} ${v.setIndex ?? ""}`);
-    return `verdict « comité » : ${labelOf(v.setIndex)} (score ${v.score.toFixed(2)})`;
+    return `verdict "committee": ${labelOf(v.setIndex)} (score ${v.score.toFixed(2)})`;
   });
-  await check("texte du jeu tiré retapé dans l'ordre canonique, vu après T", async () => {
+  await check("drawn set text retyped in canonical order, seen after T", async () => {
     const leak = renderPlain(publicSets.find((s) => s.setIndex === drawn).set);
     const v = attributeLeak({ ...base, leakedText: leak, seenAtMs: inCentreWindow });
     assert(v.verdict === "unattributed", `verdict ${v.verdict}`);
-    return `verdict « non attribuée » (fuite en fenêtre de centre, le comité ${labelOf(drawn)} n'est pas accusé)`;
+    return `verdict "unattributed" (leak in the centre window, committee ${labelOf(drawn)} is not accused)`;
   });
-  await check("rumeur sans rapport", async () => {
-    const rumour = "Le sujet de maths tombera sur la géométrie dans l'espace et les probabilités, mon cousin à Parakou l'a vu hier soir.";
+  await check("unrelated rumour", async () => {
+    const rumour = "The maths paper will be on solid geometry and probability, my cousin in Riverside saw it last night.";
     const v = attributeLeak({ ...base, leakedText: rumour, seenAtMs: T + 60_000 });
     assert(v.verdict === "no-match", `verdict ${v.verdict}`);
-    return `verdict « aucune correspondance » (score ${v.score.toFixed(2)})`;
+    return `verdict "no match" (score ${v.score.toFixed(2)})`;
   });
 
   // j. Flag
-  step("Signalement public de Parakou avec la preuve (après la révélation)");
-  await check("flagCentre(Parakou) accepté sur la chaîne", async () => {
+  step("Public flag of Riverside with the evidence (after the reveal)");
+  await check("flagCentre(Riverside) accepted on chain", async () => {
     const evidence = ethers.keccak256(ethers.toUtf8Bytes(photo));
-    const rc = await (await registry.flagCentre(examId, parakou.centreId, evidence)).wait();
+    const rc = await (await registry.flagCentre(examId, riverside.centreId, evidence)).wait();
     const ev = rc.logs.map((l) => iface.parseLog(l)).find((l) => l?.name === "CentreFlagged");
-    assert(ev && ev.args.centreId === parakou.centreId && ev.args.evidenceHash === evidence, "événement CentreFlagged absent ou faux");
-    return `événement CentreFlagged, preuve ${evidence.slice(0, 18)}...`;
+    assert(ev && ev.args.centreId === riverside.centreId && ev.args.evidenceHash === evidence, "CentreFlagged event missing or wrong");
+    return `CentreFlagged event, evidence ${evidence.slice(0, 18)}...`;
   });
 
-  console.log(`\n${failures === 0 ? "RÉSULTAT : OK" : "RÉSULTAT : FAIL"} (${checks - failures}/${checks} vérifications conformes)`);
+  console.log(`\n${failures === 0 ? "RESULT: OK" : "RESULT: FAIL"} (${checks - failures}/${checks} checks passed)`);
   return failures === 0 ? 0 : 1;
 
   /** Wait until the beacon has emitted the round and a block of that round is mined. */
@@ -385,7 +385,7 @@ async function main() {
         const res = await fetch(`${state.beaconUrl}/public/${round}`);
         if (res.ok && Number(await registry.currentRound()) >= round) return;
       } else if (Date.now() - lastPrint >= 10_000) {
-        info(`${what} dans ${Math.ceil(left / 1000)} s`);
+        info(`${what} in ${Math.ceil(left / 1000)} s`);
         lastPrint = Date.now();
       }
       await sleep(Math.min(Math.max(left, 200), 1000));
@@ -396,6 +396,6 @@ async function main() {
 main()
   .then((code) => process.exit(code))
   .catch((e) => {
-    console.log(`\nFAIL  erreur inattendue : ${e?.stack ?? e}`);
+    console.log(`\nFAIL  unexpected error: ${e?.stack ?? e}`);
     process.exit(1);
   });

@@ -15,7 +15,7 @@ app/
   scripts/            beacon-server.mjs (local drand compatible relay), seed-demo.mjs, demo-cli.mjs
   shared/             generated, gitignored except README: deployment.json, beacon-info.json, beacon-key.json,
                       demo-state.json (demo keys), sets/, packages/<examId>/ (sealed files, plan B for IPFS)
-  web/                Next.js 14 static export, French and English. Pages: /enrolement /comite /centre /public
+  web/                Next.js 14 static export, English. Pages: /enrolment /committee /centre /public
                       scripts/serve.mjs (static server, /shared/ falls back to app/shared), smoke.mjs, e2e-live.mjs
 ```
 
@@ -50,7 +50,7 @@ All commands run from `app/`.
 | `make install` | `npm ci` in contracts, packages/seal (then builds `dist/`), scripts, web (the web links the built seal module). |
 | `make test` | Contract tests (64), seal build + typecheck + tests (39), web typecheck + static build + browser smoke (pages without config, seal self test in the browser, pages with chain and relay down). |
 | `make demo` | Browser demo on a fresh local stack, runs until Ctrl+C (see below). |
-| `make demo-cli` | Same story without a browser: beacon period 1 s, opening in 20 s, 40 checks, prints `RÉSULTAT : OK (40/40 vérifications conformes)`. |
+| `make demo-cli` | Same story without a browser: beacon period 1 s, opening in 20 s, 40 checks, prints `RESULT: OK (40/40 checks passed)`. |
 | `make e2e` | Same stack as `make demo`, short (period 1 s, opening in 75 s), then `web/scripts/e2e-live.mjs` drives the four screens in Chromium (33 checks, about 2 min 10 s). Fails if any check fails. Prints `E2E OK`. |
 | `make clean` | Removes everything generated in `shared/` (except README.md), `web/out/` and `web/public/config.json`. |
 
@@ -58,12 +58,12 @@ Overrides: `make demo DEMO_OPEN_IN=180`, `DEMO_PERIOD`, `E2E_OPEN_IN`, `E2E_PERI
 
 ### `make demo`
 
-Starts a Hardhat node and the local beacon (period 3 s, new key with `--reset`), deploys `SealRegistry` with the beacon genesis and period, seeds the "Examen blanc régional de mathématiques" (4 centres Cotonou, Parakou, Porto-Novo, Natitingou; committees A to D; reserve committee R; opening in 240 s), writes `web/public/config.json`, builds the web if `web/out/` is missing, serves it on http://127.0.0.1:3000, then prints the URLs and the round times:
+Starts a Hardhat node and the local beacon (period 3 s, new key with `--reset`), deploys `SealRegistry` with the beacon genesis and period, seeds the "Regional mock mathematics exam" (4 centres Northgate, Riverside, Eastport, Hillcrest; committees A to D; reserve committee R; opening in 240 s), writes `web/public/config.json`, builds the web if `web/out/` is missing, serves it on http://127.0.0.1:3000, then prints the URLs and the round times:
 
 ```
   Home        http://127.0.0.1:3000/
-  Enrolment   http://127.0.0.1:3000/enrolement/   (exam office: centres, frozen list, phantom centre refused)
-  Committee   http://127.0.0.1:3000/comite/       (committees A to D and R: seal in the browser, burn a set)
+  Enrolment   http://127.0.0.1:3000/enrolment/    (exam office: centres, frozen list, phantom centre refused)
+  Committee   http://127.0.0.1:3000/committee/    (committees A to D and R: seal in the browser, burn a set)
   Centre      http://127.0.0.1:3000/centre/       (centre heads: key check, signature, offline opening, print)
   Public      http://127.0.0.1:3000/public/       (anyone, juror: no key before T, reveal, leak verifier)
 Round times (beacon period 3 s):
@@ -81,10 +81,10 @@ Each page has a role selector (demo wallets from `demo-state.json`). Ctrl+C stop
 | Time | Script | Where |
 |---|---|---|
 | 0:00, 0:40 | Hazaribagh 2024, bank time locks | Slides, no screen |
-| 1:10 | Frozen list of 4 centres, four committees seal, opening in 2 minutes | `/enrolement/` (frozen list), `/comite/` as committee C: list matches the announced count, seal in the browser (the seed already submitted, the chain answers AlreadyDone); `/public/` countdown and "no key exists before round N" (relay answers 425). Transactions go to local Hardhat, not Base Sepolia (see plan B). |
-| 1:40 | A juror downloads the Cotonou package and fails; a fifth centre is refused | `/public/` "Juré : prenez le sujet", download, try to open: "Trop tôt". `/enrolement/` "Tenter d'ajouter un centre fantôme": refused (AlreadyDone, KeyFrozen). |
-| 3:10, staged before T | Committee C saw its set on Telegram: it burns it | `/comite/` as committee C, "Brûler mon jeu" (must be done at least one round before the opening round; after that the chain says TooLate). |
-| 2:20 | The round falls. Juror: "valid signature, you are not a centre". Natitingou, offline, pastes the signature, draws set B, prints with its fingerprint | `/public/` juror open after T. `/centre/` as Natitingou: fetch the signature (base32 shown), then "Hors ligne (SMS)", paste the base32, open: drawn set avoids C, fingerprinted paper, record copy indexes. |
+| 1:10 | Frozen list of 4 centres, four committees seal, opening in 2 minutes | `/enrolment/` (frozen list), `/committee/` as committee C: list matches the announced count, seal in the browser (the seed already submitted, the chain answers AlreadyDone); `/public/` countdown and "no key exists before round N" (relay answers 425). Transactions go to local Hardhat, not Base Sepolia (see plan B). |
+| 1:40 | A juror downloads the Northgate package and fails; a fifth centre is refused | `/public/` "Juror: take the paper", download, try to open: "Too early". `/enrolment/` "Try to add a phantom centre": refused (AlreadyDone, KeyFrozen). |
+| 3:10, staged before T | Committee C saw its set on Telegram: it burns it | `/committee/` as committee C, "Burn my set" (must be done at least one round before the opening round; after that the chain says TooLate). |
+| 2:20 | The round falls. Juror: "valid signature, you are not a centre". Hillcrest, offline, pastes the signature, draws set B, prints with its fingerprint | `/public/` juror open after T. `/centre/` as Hillcrest: fetch the signature (base32 shown), then "Offline (SMS)", paste the base32, open: drawn set avoids C, fingerprinted paper, record copy indexes. |
 | 3:10 | The draw avoided C. Verifier: photo (centre 2), text before T (committee C), retyped after T (unattributed) | `/public/` after the reveal round (open + 60 s): reveal sets and `r_c`, then the three verifier presets; flag a centre. |
 | 4:00 | Limits, kit cost, pilot | Slides; reserve mode shown in `/centre/` after the reserve round if time allows. |
 

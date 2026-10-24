@@ -70,7 +70,7 @@ describe("attributeLeak (dated rule)", () => {
 
   it("a reserve set leaked before its own opening points to the reserve committee", () => {
     const reserveIndex = SETS.length;
-    const reserveSet = makeSet("Jeu R", 9);
+    const reserveSet = makeSet("Set R", 9);
     const RT = roundTime(b.info, revealRound + 600); // reserve opens after the main reveal
     const withReserve = { ...base, sets: [...sets, { setIndex: reserveIndex, set: reserveSet, openTimeMs: RT }] };
     for (const seenAtMs of [T - 1000, T + 60_000, R + 60_000, RT - 1]) {
@@ -85,7 +85,7 @@ describe("attributeLeak (dated rule)", () => {
   });
 
   it("an unrelated rumour is no-match, before or after T", () => {
-    const rumour = "Le sujet de maths tombera sur la géométrie dans l'espace et les probabilités, mon cousin à Parakou l'a vu hier soir.";
+    const rumour = "The maths paper will be on solid geometry and probability, my cousin in Riverside saw it last night.";
     for (const seenAtMs of [T - 1000, T + 1000]) {
       const v = attributeLeak({ ...base, leakedText: rumour, seenAtMs });
       expect(v.verdict).toBe("no-match");

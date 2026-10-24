@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Seeds the "Examen blanc régional de mathématiques" demo on a freshly deployed SealRegistry.
+// Seeds the "Regional mock mathematics exam" demo on a freshly deployed SealRegistry.
 // Assumes: beacon-server.mjs and a Hardhat node are running, ../shared/deployment.json exists and
 // was deployed with the genesis and period of ../shared/beacon-info.json.
 // Usage: node seed-demo.mjs [--open-in 120] [--beacon http://127.0.0.1:8787] [--rpc http://127.0.0.1:8545]
@@ -37,8 +37,8 @@ import {
 } from "./lib.mjs";
 import { EXAM_TITLE, SET_LABELS, SUBJECT, demoSet } from "./demo-sets.mjs";
 
-const CENTRE_NAMES = ["Cotonou", "Parakou", "Porto-Novo", "Natitingou"];
-const PHANTOM_NAME = "Centre fantôme";
+const CENTRE_NAMES = ["Northgate", "Riverside", "Eastport", "Hillcrest"];
+const PHANTOM_NAME = "Phantom centre";
 const ROUND_GAP = 20; // open -> reveal -> reserveOpen -> reserveReveal
 const FUNDING = ethers.parseEther("10");
 
@@ -64,7 +64,7 @@ async function main() {
   const { chainId } = await provider.getNetwork();
   if (Number(chainId) !== deployment.chainId) throw new Error(`node chainId ${chainId}, deployment says ${deployment.chainId}`);
   if ((await provider.getCode(deployment.address)) === "0x") throw new Error(`no contract at ${deployment.address}: deploy first`);
-  if (await ensureWallClockMining(provider)) log("nœud Hardhat : un bloc par seconde, horodatage aligné sur l'horloge");
+  if (await ensureWallClockMining(provider)) log("Hardhat node: one block per second, timestamps aligned to the wall clock");
 
   // Office = account 0 of the node, the deployer. It signs through the node's unlocked account:
   // no office private key is known to the scripts or written to demo-state.json.
@@ -103,12 +103,12 @@ async function main() {
     batch.push(await registry.registerCentre(c.centreId, recipientToBytes32(c.recipient), c.wallet.address, c.name, { nonce: nonce++ }));
   }
   await Promise.all(batch.map((tx) => tx.wait()));
-  log(`${batch.length - centres.length} portefeuilles de démo financés, ${centres.length} centres inscrits avec leur clé X25519`);
+  log(`${batch.length - centres.length} demo wallets funded, ${centres.length} centres registered with their X25519 key`);
 
   // 2. Freeze the list (root published in the official notice).
   const root = listRoot(centreIds);
   await (await registry.freezeCentres(examId, centreIds, root, centreIds.length)).wait();
-  log(`liste gelée : ${CENTRE_NAMES.join(", ")} (racine ${root.slice(0, 18)}...)`);
+  log(`list frozen: ${CENTRE_NAMES.join(", ")} (root ${root.slice(0, 18)}...)`);
 
   // 3. Create the exam. Rounds from the beacon clock.
   const open = roundAt(info, Date.now() + openIn * 1000);
@@ -126,7 +126,7 @@ async function main() {
       reserve.wallet.address,
     )
   ).wait();
-  log(`examen créé : ouverture au round ${rounds.open}, révélation ${rounds.reveal}, réserve ${rounds.reserveOpen} et ${rounds.reserveReveal}`);
+  log(`exam created: opening at round ${rounds.open}, reveal ${rounds.reveal}, reserve ${rounds.reserveOpen} and ${rounds.reserveReveal}`);
 
   // 4. Committees: write the drafts, seal one copy per centre, publish the public copy, submit the root.
   fs.rmSync(FILES.setsDir, { recursive: true, force: true });
@@ -165,7 +165,7 @@ async function main() {
     joins.push(await asCentre.joinExam(examId, c.centreId, commitRc(c.rcHex), ethers.toUtf8Bytes(tlocked)));
   }
   await Promise.all([...submissions, ...joins].map((tx) => tx.wait()));
-  log(`${packages.length} paquets scellés et publiés (jeux ${SET_LABELS.join(", ")}), ${joins.length} centres inscrits à l'examen`);
+  log(`${packages.length} packages sealed and published (sets ${SET_LABELS.join(", ")}), ${joins.length} centres joined the exam`);
 
   // 6. Check what the chain now holds.
   for (const p of packages) {
@@ -203,10 +203,10 @@ async function main() {
   };
   writeJson(FILES.demoState, state);
   const left = Math.round((roundTime(info, rounds.open) - Date.now()) / 1000);
-  log(`état écrit dans ${path.relative(process.cwd(), FILES.demoState) || FILES.demoState} ; ouverture dans ${left} s`);
+  log(`state written to ${path.relative(process.cwd(), FILES.demoState) || FILES.demoState}; opening in ${left} s`);
 }
 
 main().catch((e) => {
-  console.error(`[seed] ÉCHEC : ${e?.shortMessage ?? e?.message ?? e}`);
+  console.error(`[seed] FAILED: ${e?.shortMessage ?? e?.message ?? e}`);
   process.exit(1);
 });
