@@ -90,6 +90,8 @@ cd web && NEXT_PUBLIC_SITE_URL=https://sealhour.example.org npm run build
 
 `NEXT_PUBLIC_SITE_URL` (no trailing path) becomes the `metadataBase` of `web/app/layout.tsx`: `og:image`, `twitter:image` and `og:url` start with it. Unset, it defaults to `http://localhost:3000` (the port of `npm run serve`), which is fine locally but gives previews nobody else can load.
 
+`NEXT_PUBLIC_LOGIN_FIRST=1` is for public deployments without a local demo: a visitor who has not chosen a mode is sent to `/login/` instead of the "Configuration missing" message.
+
 ## Modes: demo and live testnet
 
 The login page `/login/` (also "Switch mode or log out" in the topbar's Acting-as menu) has two doors. The choice

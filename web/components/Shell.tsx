@@ -215,6 +215,10 @@ function PageTitle({ title }: { title: string }) {
 
 export function SetupMessage({ reason }: { reason?: string }) {
   const { t } = useI18n();
+  // Public deployments (NEXT_PUBLIC_LOGIN_FIRST=1) have no local demo: send visitors to the mode choice instead.
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_LOGIN_FIRST === "1" && !reason) window.location.replace("/login/");
+  }, [reason]);
   return (
     <div className="card border-warning" data-testid="setup-message">
       <div className="card-header">
