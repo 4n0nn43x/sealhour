@@ -2,7 +2,7 @@
 // Live mode (Base Sepolia + drand quicknet): the committed public config, the testnet storage namespace (burner
 // wallets, centre identities, r_c), the AppConfig of each live session, roles derived from chain state, and the
 // solo test setup (fund burners, deploy a fresh registry) and teardown (return leftover funds).
-import { ContractFactory, Interface, Wallet, getCreateAddress, randomBytes, type InterfaceAbi, type JsonRpcProvider, type Signer, type TransactionResponse } from "ethers";
+import { ContractFactory, Interface, Wallet, getCreateAddress, type InterfaceAbi, type JsonRpcProvider, type Signer, type TransactionResponse } from "ethers";
 import { QUICKNET_PIN } from "@sealhour/seal";
 import { getProvider, registry } from "./chain";
 import type { AppConfig, DemoCentre, DemoState } from "./config";
@@ -266,8 +266,10 @@ const ORACLE = new Interface(["function getL1Fee(bytes) view returns (uint256)"]
  *  0 on a chain without the oracle (the local rehearsal chain); an RPC failure throws. */
 async function l1FeePerByte(p: JsonRpcProvider): Promise<bigint> {
   if ((await p.getCode(GAS_ORACLE)) === "0x") return 0n;
+  // ethers randomBytes is capped at 1024 bytes in browsers; Web Crypto allows up to 65536 per call.
   const n = 24_576;
-  const fee = BigInt(await p.call({ to: GAS_ORACLE, data: ORACLE.encodeFunctionData("getL1Fee", [randomBytes(n)]) }));
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(n));
+  const fee = BigInt(await p.call({ to: GAS_ORACLE, data: ORACLE.encodeFunctionData("getL1Fee", [bytes]) }));
   return fee / BigInt(n) + 1n;
 }
 
